@@ -1,0 +1,167 @@
+import 'package:go_router/go_router.dart';
+
+import '../../controllers/auth_controller.dart';
+import '../../core/utils/role_utils.dart';
+import '../../pages/admin/admin_inventory_page.dart';
+import '../../pages/admin/admin_page.dart';
+import '../../pages/admin/admin_reports_page.dart';
+import '../../pages/admin/admin_users_page.dart';
+import '../../pages/appointments/appointments_page.dart';
+import '../../pages/dashboard/patient_dashboard_page.dart';
+import '../../pages/dispenser/dispenser_dashboard_page.dart';
+import '../../pages/dispenser/dispenser_history_page.dart';
+import '../../pages/dispenser/dispenser_stock_page.dart';
+import '../../pages/doctor/doctor_dashboard_page.dart';
+import '../../pages/doctor/doctor_prescriptions_page.dart';
+import '../../pages/doctor/doctor_records_page.dart';
+import '../../pages/doctors/doctors_page.dart';
+import '../../pages/home/landing_page.dart';
+import '../../pages/lab/lab_dashboard_page.dart';
+import '../../pages/lab/lab_results_page.dart';
+import '../../pages/login/login_page.dart';
+import '../../pages/login/forgot_password_page.dart';
+import '../../pages/login/register_page.dart';
+import '../../pages/patient/patient_lab_tests_page.dart';
+import '../../pages/patient/patient_notifications_page.dart';
+import '../../pages/patient/patient_profile_page.dart';
+import '../../pages/patient/patient_staff_info_page.dart';
+import '../../pages/reports/medical_reports_page.dart';
+
+GoRouter createAppRouter(AuthController auth) {
+  bool canAccess(AppRole role, String path) {
+    if (path.startsWith('/patient')) return role == AppRole.patient;
+    if (path.startsWith('/doctor')) return role == AppRole.doctor;
+    if (path.startsWith('/admin')) return role == AppRole.admin;
+    if (path.startsWith('/lab')) return role == AppRole.lab;
+    if (path.startsWith('/dispenser')) return role == AppRole.dispenser;
+    return true;
+  }
+
+  return GoRouter(
+    initialLocation: '/login',
+    refreshListenable: auth,
+    redirect: (_, state) {
+      final path = state.uri.path;
+      final loggedIn = auth.isAuthenticated;
+      final role = auth.appRole;
+
+      if (path == '/') {
+        return loggedIn ? RoleUtils.dashboardPathForRole(role) : '/login';
+      }
+
+      final tryingPrivate =
+          path.startsWith('/patient') ||
+          path.startsWith('/doctor') ||
+          path.startsWith('/admin') ||
+          path.startsWith('/lab') ||
+          path.startsWith('/dispenser');
+
+      if (!loggedIn && tryingPrivate) return '/login';
+
+      if (loggedIn && path == '/login') {
+        return RoleUtils.dashboardPathForRole(role);
+      }
+
+      if (loggedIn && path == '/register') {
+        return RoleUtils.dashboardPathForRole(role);
+      }
+
+      if (loggedIn && path == '/dashboard') {
+        return RoleUtils.dashboardPathForRole(role);
+      }
+
+      if (loggedIn && tryingPrivate && !canAccess(role, path)) {
+        return RoleUtils.dashboardPathForRole(role);
+      }
+
+      return null;
+    },
+    routes: [
+      GoRoute(path: '/', builder: (_, __) => const LoginPage()),
+      GoRoute(path: '/home', builder: (_, __) => const LandingPage()),
+      GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (_, __) => const ForgotPasswordPage(),
+      ),
+      GoRoute(path: '/register', builder: (_, __) => const RegisterPage()),
+      GoRoute(path: '/dashboard', builder: (_, __) => const LandingPage()),
+
+      GoRoute(
+        path: '/patient/dashboard',
+        builder: (_, __) => const PatientDashboardPage(),
+      ),
+      GoRoute(
+        path: '/patient/doctors',
+        builder: (_, __) => const DoctorsPage(),
+      ),
+      GoRoute(
+        path: '/patient/appointments',
+        builder: (_, __) => const AppointmentsPage(),
+      ),
+      GoRoute(
+        path: '/patient/reports',
+        builder: (_, __) => const MedicalReportsPage(),
+      ),
+      GoRoute(
+        path: '/patient/profile',
+        builder: (_, __) => const PatientProfilePage(),
+      ),
+      GoRoute(
+        path: '/patient/lab-tests',
+        builder: (_, __) => const PatientLabTestsPage(),
+      ),
+      GoRoute(
+        path: '/patient/staff',
+        builder: (_, __) => const PatientStaffInfoPage(),
+      ),
+      GoRoute(
+        path: '/patient/notifications',
+        builder: (_, __) => const PatientNotificationsPage(),
+      ),
+
+      GoRoute(
+        path: '/doctor/dashboard',
+        builder: (_, __) => const DoctorDashboardPage(),
+      ),
+      GoRoute(
+        path: '/doctor/prescriptions',
+        builder: (_, __) => const DoctorPrescriptionsPage(),
+      ),
+      GoRoute(
+        path: '/doctor/records',
+        builder: (_, __) => const DoctorRecordsPage(),
+      ),
+
+      GoRoute(path: '/admin/dashboard', builder: (_, __) => const AdminPage()),
+      GoRoute(path: '/admin/users', builder: (_, __) => const AdminUsersPage()),
+      GoRoute(
+        path: '/admin/inventory',
+        builder: (_, __) => const AdminInventoryPage(),
+      ),
+      GoRoute(
+        path: '/admin/reports',
+        builder: (_, __) => const AdminReportsPage(),
+      ),
+
+      GoRoute(
+        path: '/lab/dashboard',
+        builder: (_, __) => const LabDashboardPage(),
+      ),
+      GoRoute(path: '/lab/results', builder: (_, __) => const LabResultsPage()),
+
+      GoRoute(
+        path: '/dispenser/dashboard',
+        builder: (_, __) => const DispenserDashboardPage(),
+      ),
+      GoRoute(
+        path: '/dispenser/stock',
+        builder: (_, __) => const DispenserStockPage(),
+      ),
+      GoRoute(
+        path: '/dispenser/history',
+        builder: (_, __) => const DispenserHistoryPage(),
+      ),
+    ],
+  );
+}

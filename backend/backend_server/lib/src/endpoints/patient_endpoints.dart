@@ -36,7 +36,6 @@ class PatientEndpoint extends Endpoint {
       LEFT JOIN patient_profiles p
         ON p.user_id = u.user_id
       WHERE u.user_id = @userId
-        AND lower(u.role::text) IN ('student','teacher','staff','outside')
       ''',
         parameters: QueryParameters.named({'userId': resolvedUserId}),
       );
