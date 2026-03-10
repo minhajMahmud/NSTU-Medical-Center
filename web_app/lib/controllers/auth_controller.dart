@@ -52,10 +52,23 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _applyLoginResponse(LoginResponse res) {
+  Future<void> _applyLoginResponse(LoginResponse res) async {
     isAuthenticated = true;
     role = res.role;
     appRole = RoleUtils.parse(res.role);
+
+    if (appRole == AppRole.unknown) {
+      try {
+        final existingRole = await _authService.getCurrentRole();
+        if (existingRole != null && existingRole.isNotEmpty) {
+          role = existingRole;
+          appRole = RoleUtils.parse(existingRole);
+        }
+      } catch (_) {
+        // Keep current state and allow UI to continue gracefully.
+      }
+    }
+
     requiresEmailOtp = false;
     pendingLoginEmail = null;
     pendingLoginOtpToken = null;
@@ -72,9 +85,11 @@ class AuthController extends ChangeNotifier {
         isAuthenticated = appRole != AppRole.unknown;
       }
     } catch (_) {
-      isAuthenticated = false;
-      role = null;
-      appRole = AppRole.unknown;
+      // Do not override an already authenticated state (race-safe).
+      if (!isAuthenticated) {
+        role = null;
+        appRole = AppRole.unknown;
+      }
     } finally {
       isLoading = false;
       notifyListeners();
@@ -103,7 +118,7 @@ class AuthController extends ChangeNotifier {
         return false;
       }
 
-      _applyLoginResponse(res);
+      await _applyLoginResponse(res);
       return true;
     } catch (_) {
       error = _connectionHelpMessage('logging in');
@@ -136,7 +151,7 @@ class AuthController extends ChangeNotifier {
         error = _withResendHint(res.error ?? 'OTP verification failed');
         return false;
       }
-      _applyLoginResponse(res);
+      await _applyLoginResponse(res);
       return true;
     } catch (_) {
       error = _connectionHelpMessage('verifying OTP');
@@ -221,7 +236,7 @@ class AuthController extends ChangeNotifier {
         return false;
       }
 
-      _applyLoginResponse(res);
+      await _applyLoginResponse(res);
       signupOtpToken = null;
       signupDebugOtp = null;
       signupEmail = null;

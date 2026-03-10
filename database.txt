@@ -146,10 +146,12 @@ CREATE TABLE IF NOT EXISTS lab_tests (
 CREATE TABLE IF NOT EXISTS test_results (
   result_id SERIAL PRIMARY KEY,
   test_id INT REFERENCES lab_tests(test_id),
+  patient_name TEXT,
   mobile_number TEXT,
-  patient_type TEXT, -- STUDENT/TEACHER/OUTSIDE (legacy text used in report queries)
+  patient_type TEXT, -- STUDENT/STAFF/OUTSIDE (legacy text used in report queries)
   is_uploaded BOOLEAN DEFAULT FALSE,
   attachment_path TEXT,
+  submitted_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 

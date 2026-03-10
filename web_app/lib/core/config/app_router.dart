@@ -14,15 +14,23 @@ import '../../pages/dispenser/dispenser_stock_page.dart';
 import '../../pages/doctor/doctor_dashboard_page.dart';
 import '../../pages/doctor/doctor_prescriptions_page.dart';
 import '../../pages/doctor/doctor_records_page.dart';
-import '../../pages/doctors/doctors_page.dart';
 import '../../pages/home/landing_page.dart';
 import '../../pages/lab/lab_dashboard_page.dart';
+import '../../pages/lab/lab_manage_test_page.dart';
+import '../../pages/lab/lab_payments_page.dart';
+import '../../pages/lab/lab_profile_page.dart';
+import '../../pages/lab/lab_analytics_page.dart';
 import '../../pages/lab/lab_results_page.dart';
+import '../../pages/lab/lab_settings_page.dart';
+import '../../pages/lab/lab_support_page.dart';
+import '../../pages/lab/lab_announcements_page.dart';
+import '../../pages/lab/lab_upload_page.dart';
 import '../../pages/login/login_page.dart';
 import '../../pages/login/forgot_password_page.dart';
 import '../../pages/login/register_page.dart';
 import '../../pages/patient/patient_lab_tests_page.dart';
 import '../../pages/patient/patient_notifications_page.dart';
+import '../../pages/patient/patient_payments_page.dart';
 import '../../pages/patient/patient_profile_page.dart';
 import '../../pages/patient/patient_staff_info_page.dart';
 import '../../pages/reports/medical_reports_page.dart';
@@ -93,7 +101,7 @@ GoRouter createAppRouter(AuthController auth) {
       ),
       GoRoute(
         path: '/patient/doctors',
-        builder: (_, __) => const DoctorsPage(),
+        redirect: (_, __) => '/patient/dashboard',
       ),
       GoRoute(
         path: '/patient/appointments',
@@ -110,6 +118,10 @@ GoRouter createAppRouter(AuthController auth) {
       GoRoute(
         path: '/patient/lab-tests',
         builder: (_, __) => const PatientLabTestsPage(),
+      ),
+      GoRoute(
+        path: '/patient/payments',
+        builder: (_, __) => const PatientPaymentsPage(),
       ),
       GoRoute(
         path: '/patient/staff',
@@ -147,6 +159,29 @@ GoRouter createAppRouter(AuthController auth) {
       GoRoute(
         path: '/lab/dashboard',
         builder: (_, __) => const LabDashboardPage(),
+      ),
+      GoRoute(
+        path: '/lab/payments',
+        builder: (_, __) => const LabPaymentsPage(),
+      ),
+      GoRoute(path: '/lab/upload', builder: (_, __) => const LabUploadPage()),
+      GoRoute(
+        path: '/lab/manage-test',
+        builder: (_, __) => const LabManageTestPage(),
+      ),
+      GoRoute(path: '/lab/profile', builder: (_, __) => const LabProfilePage()),
+      GoRoute(
+        path: '/lab/analytics',
+        builder: (_, __) => const LabAnalyticsPage(),
+      ),
+      GoRoute(
+        path: '/lab/settings',
+        builder: (_, __) => const LabSettingsPage(),
+      ),
+      GoRoute(path: '/lab/support', builder: (_, __) => const LabSupportPage()),
+      GoRoute(
+        path: '/lab/announcements',
+        builder: (_, __) => const LabAnnouncementsPage(),
       ),
       GoRoute(path: '/lab/results', builder: (_, __) => const LabResultsPage()),
 

@@ -39,6 +39,7 @@ class RoleDashboardController extends ChangeNotifier {
   LabToday? labSummary;
   List<LabTenHistory> labHistory = [];
   List<TestResult> labResults = [];
+  List<LabTests> labAvailableTests = [];
 
   // Dispenser
   DispenserProfileR? dispenserProfile;
@@ -66,6 +67,48 @@ class RoleDashboardController extends ChangeNotifier {
     patientAmbulanceContacts = ambulance;
     patientNotifications = notifications;
   });
+
+  /// Loads only patient profile data.
+  ///
+  /// This is used by profile screens so they don't fail to render when
+  /// unrelated patient endpoints (appointments, reports, etc.) fail.
+  Future<void> loadPatientProfileOnly() => _load(() async {
+    patientProfile = await _service.getPatientProfile();
+  });
+
+  /// Loads profile + clinical document summaries used in patient profile page.
+  ///
+  /// Keeps the profile page independent from unrelated endpoints while still
+  /// showing doctor prescriptions and lab reports.
+  Future<void> loadPatientProfileWithClinicalData() async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      patientProfile = await _service.getPatientProfile();
+    } catch (e) {
+      error = e.toString();
+    }
+
+    try {
+      final appointments = await _service.getPatientAppointments();
+      patientAppointments = appointments
+          .map(AppointmentModel.fromPrescription)
+          .toList();
+    } catch (e) {
+      error ??= e.toString();
+    }
+
+    try {
+      patientReports = await _service.getPatientReports();
+    } catch (e) {
+      error ??= e.toString();
+    }
+
+    isLoading = false;
+    notifyListeners();
+  }
 
   Future<bool> updatePatientProfile({
     required String name,
@@ -123,6 +166,7 @@ class RoleDashboardController extends ChangeNotifier {
     labSummary = await _service.getLabSummary();
     labHistory = await _service.getLabHistory();
     labResults = await _service.getAllLabResults();
+    labAvailableTests = await _service.getAllLabTests();
   });
 
   Future<void> loadDispenser() => _load(() async {

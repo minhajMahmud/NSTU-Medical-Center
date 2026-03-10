@@ -24,7 +24,7 @@ class WebApp extends StatefulWidget {
 
 class _WebAppState extends State<WebApp> {
   late final AuthController _authController;
-  late final GoRouter _router;
+  late GoRouter _router;
 
   @override
   void initState() {
@@ -32,6 +32,13 @@ class _WebAppState extends State<WebApp> {
     _authController = AuthController(AuthService());
     _router = createAppRouter(_authController);
     Future.microtask(_authController.bootstrap);
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _router.dispose();
+    _router = createAppRouter(_authController);
   }
 
   @override

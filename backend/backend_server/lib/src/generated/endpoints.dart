@@ -2171,6 +2171,54 @@ class Endpoints extends _i1.EndpointDispatch {
                 resultId: params['resultId'],
               ),
         ),
+        'getLabPaymentItems': _i1.MethodConnector(
+          name: 'getLabPaymentItems',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['lab'] as _i8.LabEndpoint)
+                  .getLabPaymentItems(session),
+        ),
+        'collectCashPayment': _i1.MethodConnector(
+          name: 'collectCashPayment',
+          params: {
+            'resultId': _i1.ParameterDescription(
+              name: 'resultId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['lab'] as _i8.LabEndpoint).collectCashPayment(
+                    session,
+                    resultId: params['resultId'],
+                  ),
+        ),
+        'markPatientNotified': _i1.MethodConnector(
+          name: 'markPatientNotified',
+          params: {
+            'resultId': _i1.ParameterDescription(
+              name: 'resultId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['lab'] as _i8.LabEndpoint).markPatientNotified(
+                    session,
+                    resultId: params['resultId'],
+                  ),
+        ),
         'submitResultWithUrl': _i1.MethodConnector(
           name: 'submitResultWithUrl',
           params: {
@@ -2519,6 +2567,41 @@ class Endpoints extends _i1.EndpointDispatch {
                 Map<String, dynamic> params,
               ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getMyLabReports(session),
+        ),
+        'getMyLabPaymentItems': _i1.MethodConnector(
+          name: 'getMyLabPaymentItems',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
+                  .getMyLabPaymentItems(session),
+        ),
+        'payMyLabBill': _i1.MethodConnector(
+          name: 'payMyLabBill',
+          params: {
+            'resultId': _i1.ParameterDescription(
+              name: 'resultId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'paymentMethod': _i1.ParameterDescription(
+              name: 'paymentMethod',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['patient'] as _i11.PatientEndpoint).payMyLabBill(
+                    session,
+                    resultId: params['resultId'],
+                    paymentMethod: params['paymentMethod'],
+                  ),
         ),
         'getMyPrescriptionList': _i1.MethodConnector(
           name: 'getMyPrescriptionList',

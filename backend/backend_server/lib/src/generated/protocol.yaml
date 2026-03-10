@@ -81,6 +81,9 @@ lab:
   - updateLabTest:
   - sendDummySms:
   - submitResult:
+  - getLabPaymentItems:
+  - collectCashPayment:
+  - markPatientNotified:
   - submitResultWithUrl:
   - getAllTestResults:
   - getStaffProfile:
@@ -102,6 +105,8 @@ patient:
   - getUserRole:
   - updatePatientProfile:
   - getMyLabReports:
+  - getMyLabPaymentItems:
+  - payMyLabBill:
   - getMyPrescriptionList:
   - finalizeReportUpload:
   - getMyExternalReports:

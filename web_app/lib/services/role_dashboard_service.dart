@@ -69,6 +69,7 @@ class RoleDashboardService {
       _client.lab.getLast10TestHistory();
   Future<List<TestResult>> getAllLabResults() =>
       _client.lab.getAllTestResults();
+  Future<List<LabTests>> getAllLabTests() => _client.lab.getAllLabTests();
 
   // Dispenser
   Future<DispenserProfileR?> getDispenserProfile() =>

@@ -7,6 +7,88 @@ class PatientEndpoint extends Endpoint {
   @override
   bool get requireLogin => true;
 
+  Future<void> _ensurePaymentColumns(Session session) async {
+    await session.db.unsafeExecute('''
+      ALTER TABLE test_results
+      ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'PENDING';
+    ''');
+    await session.db.unsafeExecute('''
+      ALTER TABLE test_results
+      ADD COLUMN IF NOT EXISTS payment_method TEXT;
+    ''');
+    await session.db.unsafeExecute('''
+      ALTER TABLE test_results
+      ADD COLUMN IF NOT EXISTS transaction_id TEXT;
+    ''');
+    await session.db.unsafeExecute('''
+      ALTER TABLE test_results
+      ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP;
+    ''');
+    await session.db.unsafeExecute('''
+      ALTER TABLE test_results
+      ADD COLUMN IF NOT EXISTS patient_notified_at TIMESTAMP;
+    ''');
+  }
+
+  String _normalizePaymentMethod(String raw) {
+    final value = raw.trim().toUpperCase();
+    switch (value) {
+      case 'BKASH':
+        return 'BKASH';
+      case 'NAGAD':
+        return 'NAGAD';
+      case 'ROCKET':
+        return 'ROCKET';
+      case 'VISA':
+      case 'VISA CARD':
+        return 'VISA';
+      default:
+        return 'BKASH';
+    }
+  }
+
+  String _paymentTxnPrefix(String method) {
+    switch (method) {
+      case 'BKASH':
+        return 'BK';
+      case 'NAGAD':
+        return 'NG';
+      case 'ROCKET':
+        return 'RK';
+      case 'VISA':
+        return 'VS';
+      default:
+        return 'BK';
+    }
+  }
+
+  LabPaymentItem _mapLabPaymentItem(Map<String, dynamic> m) {
+    return LabPaymentItem(
+      resultId: m['result_id'] as int,
+      testId: m['test_id'] as int,
+      serialNo: 'LAB-${(m['result_id'] as int).toString().padLeft(4, '0')}',
+      patientName: _safeString(m['patient_name']).trim().isEmpty
+          ? 'Unknown Patient'
+          : _safeString(m['patient_name']),
+      mobileNumber: _safeString(m['mobile_number']),
+      patientType: _safeString(m['patient_type']).trim().isEmpty
+          ? 'STUDENT'
+          : _safeString(m['patient_type']).toUpperCase(),
+      testName: _safeString(m['test_name']),
+      amount: _toDouble(m['amount']),
+      createdAt: (m['created_at'] as DateTime?) ?? DateTime.now(),
+      isUploaded: _toBool(m['is_uploaded']),
+      submittedAt: m['submitted_at'] as DateTime?,
+      paymentStatus: _safeString(m['payment_status']).trim().isEmpty
+          ? 'PENDING'
+          : _safeString(m['payment_status']).toUpperCase(),
+      paymentMethod: m['payment_method'] as String?,
+      transactionId: m['transaction_id'] as String?,
+      paidAt: m['paid_at'] as DateTime?,
+      patientNotifiedAt: m['patient_notified_at'] as DateTime?,
+    );
+  }
+
   DateTime? _safeDateTime(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
@@ -244,6 +326,130 @@ class PatientEndpoint extends Endpoint {
     }
   }
 
+  Future<List<LabPaymentItem>> getMyLabPaymentItems(Session session) async {
+    try {
+      await _ensurePaymentColumns(session);
+      final resolvedUserId = requireAuthenticatedUserId(session);
+      final rows = await session.db.unsafeQuery(
+        '''
+        SELECT
+          tr.result_id,
+          tr.test_id,
+          COALESCE(tr.patient_name, 'Unknown Patient') AS patient_name,
+          COALESCE(tr.mobile_number, '') AS mobile_number,
+          COALESCE(tr.patient_type, 'STUDENT') AS patient_type,
+          COALESCE(lt.test_name, 'Test ' || tr.test_id::text) AS test_name,
+          COALESCE(tr.created_at, NOW()) AS created_at,
+          COALESCE(tr.is_uploaded, FALSE) AS is_uploaded,
+          tr.submitted_at,
+          COALESCE(tr.payment_status, 'PENDING') AS payment_status,
+          tr.payment_method,
+          tr.transaction_id,
+          tr.paid_at,
+          tr.patient_notified_at,
+          CASE
+            WHEN UPPER(COALESCE(tr.patient_type, 'STUDENT')) IN ('STAFF', 'TEACHER') THEN COALESCE(lt.teacher_fee, 0)
+            WHEN UPPER(COALESCE(tr.patient_type, 'STUDENT')) = 'OUTSIDE' THEN COALESCE(lt.outside_fee, 0)
+            ELSE COALESCE(lt.student_fee, 0)
+          END AS amount
+        FROM users u
+        JOIN test_results tr ON tr.mobile_number = u.phone
+        LEFT JOIN lab_tests lt ON lt.test_id = tr.test_id
+        WHERE u.user_id = @userId
+        ORDER BY COALESCE(tr.created_at, NOW()) DESC, tr.result_id DESC
+        ''',
+        parameters: QueryParameters.named({'userId': resolvedUserId}),
+      );
+
+      return rows.map((r) => _mapLabPaymentItem(r.toColumnMap())).toList();
+    } catch (e, stack) {
+      session.log('Error fetching lab payment items: $e',
+          level: LogLevel.error, stackTrace: stack);
+      return [];
+    }
+  }
+
+  Future<LabPaymentItem?> payMyLabBill(
+    Session session, {
+    required int resultId,
+    required String paymentMethod,
+  }) async {
+    try {
+      await _ensurePaymentColumns(session);
+      final resolvedUserId = requireAuthenticatedUserId(session);
+      final ownership = await session.db.unsafeQuery(
+        '''
+        SELECT tr.result_id
+        FROM users u
+        JOIN test_results tr ON tr.mobile_number = u.phone
+        WHERE u.user_id = @userId AND tr.result_id = @id
+        LIMIT 1
+        ''',
+        parameters:
+            QueryParameters.named({'userId': resolvedUserId, 'id': resultId}),
+      );
+      if (ownership.isEmpty) return null;
+
+      final method = _normalizePaymentMethod(paymentMethod);
+      final now = DateTime.now();
+      final txn =
+          '${_paymentTxnPrefix(method)}-$resultId-${now.millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+
+      await session.db.unsafeExecute(
+        '''
+        UPDATE test_results
+        SET payment_status = 'PAID',
+            payment_method = @method,
+            transaction_id = COALESCE(transaction_id, @txn),
+            paid_at = COALESCE(paid_at, NOW())
+        WHERE result_id = @id
+        ''',
+        parameters: QueryParameters.named({
+          'id': resultId,
+          'method': method,
+          'txn': txn,
+        }),
+      );
+
+      final rows = await session.db.unsafeQuery(
+        '''
+        SELECT
+          tr.result_id,
+          tr.test_id,
+          COALESCE(tr.patient_name, 'Unknown Patient') AS patient_name,
+          COALESCE(tr.mobile_number, '') AS mobile_number,
+          COALESCE(tr.patient_type, 'STUDENT') AS patient_type,
+          COALESCE(lt.test_name, 'Test ' || tr.test_id::text) AS test_name,
+          COALESCE(tr.created_at, NOW()) AS created_at,
+          COALESCE(tr.is_uploaded, FALSE) AS is_uploaded,
+          tr.submitted_at,
+          COALESCE(tr.payment_status, 'PENDING') AS payment_status,
+          tr.payment_method,
+          tr.transaction_id,
+          tr.paid_at,
+          tr.patient_notified_at,
+          CASE
+            WHEN UPPER(COALESCE(tr.patient_type, 'STUDENT')) IN ('STAFF', 'TEACHER') THEN COALESCE(lt.teacher_fee, 0)
+            WHEN UPPER(COALESCE(tr.patient_type, 'STUDENT')) = 'OUTSIDE' THEN COALESCE(lt.outside_fee, 0)
+            ELSE COALESCE(lt.student_fee, 0)
+          END AS amount
+        FROM test_results tr
+        LEFT JOIN lab_tests lt ON lt.test_id = tr.test_id
+        WHERE tr.result_id = @id
+        LIMIT 1
+        ''',
+        parameters: QueryParameters.named({'id': resultId}),
+      );
+
+      if (rows.isEmpty) return null;
+      return _mapLabPaymentItem(rows.first.toColumnMap());
+    } catch (e, stack) {
+      session.log('Error paying lab bill: $e',
+          level: LogLevel.error, stackTrace: stack);
+      return null;
+    }
+  }
+
 // ১. ড্রপডাউনে দেখানোর জন্য রোগীর আগের প্রেসক্রিপশন লিস্ট আনা
   Future<List<PrescriptionList>> getMyPrescriptionList(Session session) async {
     final resolvedUserId = requireAuthenticatedUserId(session);
@@ -255,7 +461,7 @@ class PatientEndpoint extends Endpoint {
         p.revised_from_id AS revised_from_prescription_id,
         (
           SELECT r.report_id
-          FROM UploadpatientR r
+          FROM "UploadpatientR" r
           WHERE r.patient_id = p.patient_id
             AND p.revised_from_id IS NOT NULL
             AND r.prescription_id = p.revised_from_id
@@ -264,7 +470,7 @@ class PatientEndpoint extends Endpoint {
         ) AS source_report_id,
         (
           SELECT r.type
-          FROM UploadpatientR r
+          FROM "UploadpatientR" r
           WHERE r.patient_id = p.patient_id
             AND p.revised_from_id IS NOT NULL
             AND r.prescription_id = p.revised_from_id
@@ -273,7 +479,7 @@ class PatientEndpoint extends Endpoint {
         ) AS source_report_type,
         (
           SELECT r.created_at
-          FROM UploadpatientR r
+          FROM "UploadpatientR" r
           WHERE r.patient_id = p.patient_id
             AND p.revised_from_id IS NOT NULL
             AND r.prescription_id = p.revised_from_id
@@ -324,7 +530,7 @@ class PatientEndpoint extends Endpoint {
 
       // ১২ ঘণ্টা রিপ্লেস লজিক: চেক করুন এই প্রেসক্রিপশনের জন্য কোনো রিপোর্ট অলরেডি আছে কি না
       final existing = await session.db.unsafeQuery(
-        '''SELECT report_id, created_at FROM UploadpatientR
+        '''SELECT report_id, created_at FROM "UploadpatientR"
            WHERE patient_id = @pId AND prescription_id = @refId 
            ORDER BY created_at DESC LIMIT 1''',
         parameters: QueryParameters.named(
@@ -338,7 +544,7 @@ class PatientEndpoint extends Endpoint {
         if (DateTime.now().difference(createdAt).inHours < 12) {
           // ১২ ঘণ্টার কম হলে আপডেট করুন
           await session.db.unsafeExecute(
-            'UPDATE UploadpatientR SET file_path = @path, type = @type WHERE report_id = @report_id ',
+            'UPDATE "UploadpatientR" SET file_path = @path, type = @type WHERE report_id = @report_id ',
             parameters: QueryParameters.named({
               'report_id': existing.first.toColumnMap()['report_id'],
               'path': secureUrl,
@@ -359,7 +565,7 @@ class PatientEndpoint extends Endpoint {
 
       // ডাটাবেসে নতুন রিপোর্ট সেভ
       await session.db.unsafeExecute('''
-        INSERT INTO UploadpatientR
+        INSERT INTO "UploadpatientR"
         (patient_id, type, report_date, file_path, prescribed_doctor_id, prescription_id, uploaded_by, created_at)
         VALUES (@pId, @type, CURRENT_DATE, @path, @docId, @refId, @pId, NOW())
       ''',
@@ -396,7 +602,7 @@ class PatientEndpoint extends Endpoint {
           report_id,
           patient_id, type, report_date, file_path, 
           prescribed_doctor_id, prescription_id, uploaded_by, reviewed, created_at
-        FROM UploadpatientR
+        FROM "UploadpatientR"
         WHERE patient_id = @userId
         ORDER BY created_at DESC
         ''',
@@ -441,7 +647,7 @@ class PatientEndpoint extends Endpoint {
           p.revised_from_id AS revised_from_prescription_id,
           (
             SELECT r.report_id
-            FROM UploadpatientR r
+            FROM "UploadpatientR" r
             WHERE r.patient_id = p.patient_id
               AND p.revised_from_id IS NOT NULL
               AND r.prescription_id = p.revised_from_id
@@ -450,7 +656,7 @@ class PatientEndpoint extends Endpoint {
           ) AS source_report_id,
           (
             SELECT r.type
-            FROM UploadpatientR r
+            FROM "UploadpatientR" r
             WHERE r.patient_id = p.patient_id
               AND p.revised_from_id IS NOT NULL
               AND r.prescription_id = p.revised_from_id
@@ -459,7 +665,7 @@ class PatientEndpoint extends Endpoint {
           ) AS source_report_type,
           (
             SELECT r.created_at
-            FROM UploadpatientR r
+            FROM "UploadpatientR" r
             WHERE r.patient_id = p.patient_id
               AND p.revised_from_id IS NOT NULL
               AND r.prescription_id = p.revised_from_id
@@ -511,7 +717,7 @@ class PatientEndpoint extends Endpoint {
           p.revised_from_id AS revised_from_prescription_id,
           (
             SELECT r.report_id
-            FROM UploadpatientR r
+            FROM "UploadpatientR" r
             WHERE r.patient_id = p.patient_id
               AND p.revised_from_id IS NOT NULL
               AND r.prescription_id = p.revised_from_id
@@ -520,7 +726,7 @@ class PatientEndpoint extends Endpoint {
           ) AS source_report_id,
           (
             SELECT r.type
-            FROM UploadpatientR r
+            FROM "UploadpatientR" r
             WHERE r.patient_id = p.patient_id
               AND p.revised_from_id IS NOT NULL
               AND r.prescription_id = p.revised_from_id
@@ -529,7 +735,7 @@ class PatientEndpoint extends Endpoint {
           ) AS source_report_type,
           (
             SELECT r.created_at
-            FROM UploadpatientR r
+            FROM "UploadpatientR" r
             WHERE r.patient_id = p.patient_id
               AND p.revised_from_id IS NOT NULL
               AND r.prescription_id = p.revised_from_id

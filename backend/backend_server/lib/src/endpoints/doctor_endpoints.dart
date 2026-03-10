@@ -130,7 +130,7 @@ class DoctorEndpoint extends Endpoint {
           r.created_at,
           r.prescription_id,
           COALESCE(u.name, '') AS uploaded_by_name
-        FROM UploadpatientR r
+        FROM "UploadpatientR" r
         LEFT JOIN users u ON u.user_id = r.uploaded_by
         WHERE r.prescribed_doctor_id = @id
           AND (
@@ -356,15 +356,22 @@ class DoctorEndpoint extends Endpoint {
   Future<Map<String, String?>> getPatientByPhone(
       Session session, String phone) async {
     try {
-      // Extract last 11 digits only
-      final cleaned = phone.replaceAll(RegExp(r'[^0-9]'), '');
-      final firstPart =
-          cleaned.length >= 11 ? cleaned.substring(0, 11) : cleaned;
+      final queryText = phone.trim();
+      final cleaned = queryText.replaceAll(RegExp(r'[^0-9]'), '');
 
-      session.log('Searching for patient with first digits: $firstPart',
-          level: LogLevel.info);
+      // Normalize phone to local last 11 digits (supports +88... inputs)
+      final normalizedPhonePrefix = cleaned.isEmpty
+          ? ''
+          : (cleaned.length >= 11
+              ? cleaned.substring(cleaned.length - 11)
+              : cleaned);
 
-      // Search: phone starts with first digits (based on local 11-digit number)
+      session.log(
+        'Searching patient by query="$queryText", phonePrefix="$normalizedPhonePrefix"',
+        level: LogLevel.info,
+      );
+
+      // Search by name OR phone prefix (normalized 11-digit local number)
       final res = await session.db.unsafeQuery(
         '''
         SELECT
@@ -378,17 +385,30 @@ class DoctorEndpoint extends Endpoint {
         LEFT JOIN patient_profiles p ON p.user_id = u.user_id
         WHERE u.phone IS NOT NULL
           AND lower(u.role::text) IN ('student', 'teacher', 'staff', 'outside')
-          AND RIGHT(REPLACE(REPLACE(u.phone, ' ', ''), '-', ''), 11) LIKE @prefix
+          AND (
+            (@nameQuery <> '' AND LOWER(u.name) LIKE LOWER(@nameLike))
+            OR
+            (@phonePrefix <> '' AND RIGHT(REPLACE(REPLACE(u.phone, ' ', ''), '-', ''), 11) LIKE @phoneLikePrefix)
+          )
+        ORDER BY
+          CASE
+            WHEN @phonePrefix <> '' AND RIGHT(REPLACE(REPLACE(u.phone, ' ', ''), '-', ''), 11) = @phonePrefix THEN 0
+            ELSE 1
+          END,
+          u.user_id DESC
         LIMIT 1
         ''',
         parameters: QueryParameters.named({
-          'prefix': '$firstPart%', // Starts with typed digits
+          'nameQuery': queryText,
+          'nameLike': '%$queryText%',
+          'phonePrefix': normalizedPhonePrefix,
+          'phoneLikePrefix': '$normalizedPhonePrefix%',
         }),
       );
 
       if (res.isEmpty) {
         session.log(
-          'Patient not found with phone: $phone (prefix: $firstPart)',
+          'Patient not found with query: $queryText',
           level: LogLevel.warning,
         );
         return {'id': null, 'name': null};
@@ -509,7 +529,7 @@ class DoctorEndpoint extends Endpoint {
     try {
       final resolvedDoctorId = requireAuthenticatedUserId(session);
       final res = await session.db.unsafeQuery('''
-      SELECT * FROM UploadpatientR 
+      SELECT * FROM "UploadpatientR" 
       WHERE prescribed_doctor_id = @id 
       ORDER BY created_at DESC
     ''', parameters: QueryParameters.named({'id': resolvedDoctorId}));
@@ -542,7 +562,7 @@ class DoctorEndpoint extends Endpoint {
 
       final updated = await session.db.unsafeExecute(
         '''
-        UPDATE UploadpatientR
+        UPDATE "UploadpatientR"
         SET reviewed = TRUE
         WHERE report_id = @rid AND prescribed_doctor_id = @did
         ''',

@@ -25,6 +25,11 @@ class DashboardSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final role = context.watch<AuthController>().appRole;
+
+    if (role == AppRole.lab) {
+      return const _LabDashboardSidebar();
+    }
+
     final items = _itemsForRole(role);
     final path = GoRouterState.of(context).uri.path;
     final selected = _indexFromLocation(path, items);
@@ -70,12 +75,6 @@ class DashboardSidebar extends StatelessWidget {
             selectedIcon: Icons.person,
           ),
           _NavItem(
-            route: '/patient/doctors',
-            label: 'Doctors',
-            icon: Icons.medical_services_outlined,
-            selectedIcon: Icons.medical_services,
-          ),
-          _NavItem(
             route: '/patient/appointments',
             label: 'Appointments',
             icon: Icons.event_note_outlined,
@@ -92,6 +91,12 @@ class DashboardSidebar extends StatelessWidget {
             label: 'Lab Tests',
             icon: Icons.science_outlined,
             selectedIcon: Icons.science,
+          ),
+          _NavItem(
+            route: '/patient/payments',
+            label: 'Payments',
+            icon: Icons.payments_outlined,
+            selectedIcon: Icons.payments,
           ),
           _NavItem(
             route: '/patient/staff',
@@ -200,5 +205,148 @@ class DashboardSidebar extends StatelessWidget {
           ),
         ];
     }
+  }
+}
+
+class _LabDashboardSidebar extends StatelessWidget {
+  const _LabDashboardSidebar();
+
+  @override
+  Widget build(BuildContext context) {
+    final path = GoRouterState.of(context).uri.path;
+
+    final items = const [
+      _NavItem(
+        route: '/lab/dashboard',
+        label: 'Home',
+        icon: Icons.home_outlined,
+        selectedIcon: Icons.home,
+      ),
+      _NavItem(
+        route: '/lab/payments',
+        label: 'Payments',
+        icon: Icons.payments_outlined,
+        selectedIcon: Icons.payments,
+      ),
+      _NavItem(
+        route: '/lab/upload',
+        label: 'Upload',
+        icon: Icons.cloud_upload_outlined,
+        selectedIcon: Icons.cloud_upload,
+      ),
+      _NavItem(
+        route: '/lab/manage-test',
+        label: 'ManageTest',
+        icon: Icons.manage_accounts_outlined,
+        selectedIcon: Icons.manage_accounts,
+      ),
+      _NavItem(
+        route: '/lab/profile',
+        label: 'Profile',
+        icon: Icons.person_outline,
+        selectedIcon: Icons.person,
+      ),
+      _NavItem(
+        route: '/lab/analytics',
+        label: 'Analytics',
+        icon: Icons.analytics_outlined,
+        selectedIcon: Icons.analytics,
+      ),
+      _NavItem(
+        route: '/lab/settings',
+        label: 'Settings',
+        icon: Icons.settings_outlined,
+        selectedIcon: Icons.settings,
+      ),
+      _NavItem(
+        route: '/lab/support',
+        label: 'Support',
+        icon: Icons.help_outline,
+        selectedIcon: Icons.help,
+      ),
+      _NavItem(
+        route: '/lab/announcements',
+        label: 'Announcements',
+        icon: Icons.campaign_outlined,
+        selectedIcon: Icons.campaign,
+      ),
+    ];
+
+    return Container(
+      width: 250,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(right: BorderSide(color: Color(0xFFE5E7EB))),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0B5EA8), Color(0xFF0EA5E9)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 32,
+                      backgroundColor: Colors.white24,
+                      child: Icon(Icons.person, color: Colors.white, size: 32),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      'lab1',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 20,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Lab Technician',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 2),
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final selected = path.startsWith(item.route);
+                  return ListTile(
+                    dense: true,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    selected: selected,
+                    selectedTileColor: const Color(0xFFE8F1FF),
+                    leading: Icon(selected ? item.selectedIcon : item.icon),
+                    title: Text(item.label),
+                    onTap: () => context.go(item.route),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

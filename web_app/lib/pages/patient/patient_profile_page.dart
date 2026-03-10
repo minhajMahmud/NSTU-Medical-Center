@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:backend_client/backend_client.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../controllers/role_dashboard_controller.dart';
 import '../../widgets/common/dashboard_shell.dart';
@@ -26,7 +27,9 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     super.initState();
     Future.microtask(() {
       if (!mounted) return;
-      context.read<RoleDashboardController>().loadPatient();
+      context
+          .read<RoleDashboardController>()
+          .loadPatientProfileWithClinicalData();
     });
   }
 
@@ -42,7 +45,10 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     _nameController.text = profile.name;
     _phoneController.text = profile.phone;
     _editBloodGroup = profile.bloodGroup ?? '';
-    _editGender = profile.gender ?? '';
+    final normalizedGender = (profile.gender ?? '').trim().toLowerCase();
+    _editGender = const {'male', 'female', 'other'}.contains(normalizedGender)
+        ? normalizedGender
+        : '';
     _editDob = profile.dateOfBirth;
   }
 
@@ -83,6 +89,16 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     }
   }
 
+  void _startEditing() {
+    if (!mounted) return;
+    setState(() => _isEditing = true);
+  }
+
+  void _goToForgotPassword() {
+    if (!mounted) return;
+    context.go('/forgot-password');
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.watch<RoleDashboardController>();
@@ -102,7 +118,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                   _ProfileHeaderCard(
                     profile: profile,
                     isEditing: _isEditing,
-                    onEditPressed: () => setState(() => _isEditing = true),
+                    onEditPressed: _startEditing,
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -209,14 +225,19 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                                     decoration: const InputDecoration(
                                       labelText: 'Gender',
                                     ),
-                                    items: const ['Male', 'Female', 'Other']
-                                        .map(
-                                          (g) => DropdownMenuItem(
-                                            value: g,
-                                            child: Text(g),
-                                          ),
-                                        )
-                                        .toList(),
+                                    items:
+                                        const [
+                                              ('male', 'Male'),
+                                              ('female', 'Female'),
+                                              ('other', 'Other'),
+                                            ]
+                                            .map(
+                                              (g) => DropdownMenuItem(
+                                                value: g.$1,
+                                                child: Text(g.$2),
+                                              ),
+                                            )
+                                            .toList(),
                                     onChanged: (v) =>
                                         setState(() => _editGender = v ?? ''),
                                   ),
@@ -292,6 +313,108 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                       ],
                     ),
                   const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Text(
+                        'Clinical Documents',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () => context.go('/patient/appointments'),
+                        icon: const Icon(Icons.description_outlined),
+                        label: const Text('All Prescriptions'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: () => context.go('/patient/reports'),
+                        icon: const Icon(Icons.science_outlined),
+                        label: const Text('All Reports'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Doctor Prescriptions',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (c.patientAppointments.isEmpty)
+                            const Text('No prescriptions found yet.')
+                          else
+                            ...c.patientAppointments
+                                .take(5)
+                                .map(
+                                  (p) => ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const CircleAvatar(
+                                      backgroundColor: Color(0xFFE8F1FF),
+                                      child: Icon(Icons.description_outlined),
+                                    ),
+                                    title: Text('Prescription #${p.id}'),
+                                    subtitle: Text(
+                                      'Doctor: Dr. ${p.doctorName}\nDate: ${DateFormat('dd MMM yyyy').format(p.date.toLocal())}',
+                                    ),
+                                    trailing: const Chip(label: Text('Doctor')),
+                                    isThreeLine: true,
+                                  ),
+                                ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Lab Test Reports',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (c.patientReports.isEmpty)
+                            const Text('No lab reports found yet.')
+                          else
+                            ...c.patientReports
+                                .take(5)
+                                .map(
+                                  (r) => ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const CircleAvatar(
+                                      backgroundColor: Color(0xFFE9F8F0),
+                                      child: Icon(Icons.science_outlined),
+                                    ),
+                                    title: Text(r.testName),
+                                    subtitle: Text(
+                                      'Report ID: ${r.id} • ${DateFormat('dd MMM yyyy').format(r.date.toLocal())}',
+                                    ),
+                                    trailing: Chip(
+                                      label: Text(
+                                        r.isUploaded ? 'Uploaded' : 'Pending',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   Text(
                     'Account & Security',
                     style: theme.textTheme.headlineSmall?.copyWith(
@@ -315,15 +438,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                             'Ensure your account is using a strong password',
                           ),
                           trailing: FilledButton.tonal(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Use Forgot Password from login page for now.',
-                                  ),
-                                ),
-                              );
-                            },
+                            onPressed: _goToForgotPassword,
                             child: const Text('Update Password'),
                           ),
                         ),
@@ -362,7 +477,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                             setState(() => _isEditing = false);
                             _bindProfile(profile);
                           } else {
-                            c.loadPatient();
+                            c.loadPatientProfileWithClinicalData();
                           }
                         },
                         child: const Text('Cancel'),
@@ -373,7 +488,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                             ? null
                             : _isEditing
                             ? () => _saveChanges(c)
-                            : () => setState(() => _isEditing = true),
+                            : _startEditing,
                         child: Text(
                           _isEditing ? 'Save Changes' : 'Edit Profile',
                         ),

@@ -43,7 +43,6 @@ Configured with `go_router` in `lib/core/config/app_router.dart`:
 - `/login`
 - `/dashboard` (auto-redirects to role dashboard)
 - `/patient/dashboard`
-- `/patient/doctors`
 - `/patient/appointments`
 - `/patient/reports`
 - `/doctor/dashboard`

@@ -9,6 +9,108 @@ class LabEndpoint extends Endpoint {
   @override
   bool get requireLogin => true;
 
+  Future<void> _ensurePaymentColumns(Session session) async {
+    await session.db.unsafeExecute('''
+      ALTER TABLE test_results
+      ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'PENDING';
+    ''');
+    await session.db.unsafeExecute('''
+      ALTER TABLE test_results
+      ADD COLUMN IF NOT EXISTS payment_method TEXT;
+    ''');
+    await session.db.unsafeExecute('''
+      ALTER TABLE test_results
+      ADD COLUMN IF NOT EXISTS transaction_id TEXT;
+    ''');
+    await session.db.unsafeExecute('''
+      ALTER TABLE test_results
+      ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP;
+    ''');
+    await session.db.unsafeExecute('''
+      ALTER TABLE test_results
+      ADD COLUMN IF NOT EXISTS patient_notified_at TIMESTAMP;
+    ''');
+  }
+
+  String _paymentTxnPrefix(String method) {
+    switch (method) {
+      case 'BKASH':
+        return 'BK';
+      case 'NAGAD':
+        return 'NG';
+      case 'ROCKET':
+        return 'RK';
+      case 'VISA':
+        return 'VS';
+      default:
+        return 'CS';
+    }
+  }
+
+  Future<LabPaymentItem?> _getPaymentItemById(
+      Session session, int resultId) async {
+    await _ensurePaymentColumns(session);
+    final rows = await session.db.unsafeQuery(
+      '''
+      SELECT
+        tr.result_id,
+        tr.test_id,
+        COALESCE(tr.patient_name, 'Unknown Patient') AS patient_name,
+        COALESCE(tr.mobile_number, '') AS mobile_number,
+        COALESCE(tr.patient_type, 'STUDENT') AS patient_type,
+        COALESCE(lt.test_name, 'Test ' || tr.test_id::text) AS test_name,
+        COALESCE(tr.created_at, NOW()) AS created_at,
+        COALESCE(tr.is_uploaded, FALSE) AS is_uploaded,
+        tr.submitted_at,
+        COALESCE(tr.payment_status, 'PENDING') AS payment_status,
+        tr.payment_method,
+        tr.transaction_id,
+        tr.paid_at,
+        tr.patient_notified_at,
+        CASE
+          WHEN UPPER(COALESCE(tr.patient_type, 'STUDENT')) IN ('STAFF', 'TEACHER') THEN COALESCE(lt.teacher_fee, 0)
+          WHEN UPPER(COALESCE(tr.patient_type, 'STUDENT')) = 'OUTSIDE' THEN COALESCE(lt.outside_fee, 0)
+          ELSE COALESCE(lt.student_fee, 0)
+        END AS amount
+      FROM test_results tr
+      LEFT JOIN lab_tests lt ON lt.test_id = tr.test_id
+      WHERE tr.result_id = @id
+      LIMIT 1
+      ''',
+      parameters: QueryParameters.named({'id': resultId}),
+    );
+
+    if (rows.isEmpty) return null;
+    return _mapLabPaymentItem(rows.first.toColumnMap());
+  }
+
+  LabPaymentItem _mapLabPaymentItem(Map<String, dynamic> m) {
+    return LabPaymentItem(
+      resultId: m['result_id'] as int,
+      testId: m['test_id'] as int,
+      serialNo: 'LAB-${(m['result_id'] as int).toString().padLeft(4, '0')}',
+      patientName: _safeString(m['patient_name']).trim().isEmpty
+          ? 'Unknown Patient'
+          : _safeString(m['patient_name']),
+      mobileNumber: _safeString(m['mobile_number']),
+      patientType: _safeString(m['patient_type']).trim().isEmpty
+          ? 'STUDENT'
+          : _safeString(m['patient_type']).toUpperCase(),
+      testName: _safeString(m['test_name']),
+      amount: _toDouble(m['amount']),
+      createdAt: (m['created_at'] as DateTime?) ?? DateTime.now(),
+      isUploaded: (m['is_uploaded'] as bool?) ?? false,
+      submittedAt: m['submitted_at'] as DateTime?,
+      paymentStatus: _safeString(m['payment_status']).trim().isEmpty
+          ? 'PENDING'
+          : _safeString(m['payment_status']).toUpperCase(),
+      paymentMethod: m['payment_method'] as String?,
+      transactionId: m['transaction_id'] as String?,
+      paidAt: m['paid_at'] as DateTime?,
+      patientNotifiedAt: m['patient_notified_at'] as DateTime?,
+    );
+  }
+
   /// Fetch all lab tests using your raw SQL schema
   Future<List<LabTests>> getAllLabTests(Session session) async {
     try {
@@ -47,9 +149,18 @@ class LabEndpoint extends Endpoint {
     String patientType = 'STUDENT',
   }) async {
     try {
-      final normalizedName = patientName.trim();
+      final normalizedName =
+          patientName.trim().isEmpty ? 'Unknown Patient' : patientName.trim();
       final normalizedMobile = mobileNumber.trim();
-      final normalizedType = patientType.trim().toUpperCase();
+      final requestedType = patientType.trim().toUpperCase();
+      final normalizedType = switch (requestedType) {
+        'STUDENT' => 'STUDENT',
+        'STAFF' => 'STAFF',
+        'OUTSIDE' => 'OUTSIDE',
+        // Backward compatibility if any old client still sends TEACHER
+        'TEACHER' => 'STAFF',
+        _ => 'STUDENT',
+      };
 
       // Some deployed DBs may not yet have all expected columns.
       // Detect schema and insert accordingly to avoid runtime failure.
@@ -202,8 +313,8 @@ class LabEndpoint extends Endpoint {
     // simulate sending delay
     await Future.delayed(const Duration(milliseconds: 500));
 
-    print('We sent a SMS TO: $mobileNumber');
-    print('Message: $message');
+    session.log('We sent a SMS TO: $mobileNumber');
+    session.log('Message: $message');
     return true;
   }
 //submit result
@@ -228,6 +339,106 @@ class LabEndpoint extends Endpoint {
       session.log('Submit result failed: $e',
           level: LogLevel.error, stackTrace: st);
       return false;
+    }
+  }
+
+  Future<List<LabPaymentItem>> getLabPaymentItems(Session session) async {
+    try {
+      await _ensurePaymentColumns(session);
+      final rows = await session.db.unsafeQuery(
+        '''
+        SELECT
+          tr.result_id,
+          tr.test_id,
+          COALESCE(tr.patient_name, 'Unknown Patient') AS patient_name,
+          COALESCE(tr.mobile_number, '') AS mobile_number,
+          COALESCE(tr.patient_type, 'STUDENT') AS patient_type,
+          COALESCE(lt.test_name, 'Test ' || tr.test_id::text) AS test_name,
+          COALESCE(tr.created_at, NOW()) AS created_at,
+          COALESCE(tr.is_uploaded, FALSE) AS is_uploaded,
+          tr.submitted_at,
+          COALESCE(tr.payment_status, 'PENDING') AS payment_status,
+          tr.payment_method,
+          tr.transaction_id,
+          tr.paid_at,
+          tr.patient_notified_at,
+          CASE
+            WHEN UPPER(COALESCE(tr.patient_type, 'STUDENT')) IN ('STAFF', 'TEACHER') THEN COALESCE(lt.teacher_fee, 0)
+            WHEN UPPER(COALESCE(tr.patient_type, 'STUDENT')) = 'OUTSIDE' THEN COALESCE(lt.outside_fee, 0)
+            ELSE COALESCE(lt.student_fee, 0)
+          END AS amount
+        FROM test_results tr
+        LEFT JOIN lab_tests lt ON lt.test_id = tr.test_id
+        ORDER BY COALESCE(tr.created_at, NOW()) DESC, tr.result_id DESC
+        ''',
+      );
+
+      return rows.map((r) => _mapLabPaymentItem(r.toColumnMap())).toList();
+    } catch (e, st) {
+      session.log('Fetch lab payment items failed: $e',
+          level: LogLevel.error, stackTrace: st);
+      return [];
+    }
+  }
+
+  Future<LabPaymentItem?> collectCashPayment(
+    Session session, {
+    required int resultId,
+  }) async {
+    try {
+      await _ensurePaymentColumns(session);
+      final now = DateTime.now();
+      final txn =
+          '${_paymentTxnPrefix('CASH')}-$resultId-${now.millisecondsSinceEpoch.toRadixString(36).toUpperCase()}';
+      await session.db.unsafeExecute(
+        '''
+        UPDATE test_results
+        SET payment_status = 'PAID',
+            payment_method = 'CASH',
+            transaction_id = COALESCE(transaction_id, @txn),
+            paid_at = COALESCE(paid_at, NOW())
+        WHERE result_id = @id
+        ''',
+        parameters: QueryParameters.named({'id': resultId, 'txn': txn}),
+      );
+      return await _getPaymentItemById(session, resultId);
+    } catch (e, st) {
+      session.log('Collect cash payment failed: $e',
+          level: LogLevel.error, stackTrace: st);
+      return null;
+    }
+  }
+
+  Future<LabPaymentItem?> markPatientNotified(
+    Session session, {
+    required int resultId,
+  }) async {
+    try {
+      await _ensurePaymentColumns(session);
+      await session.db.unsafeExecute(
+        '''
+        UPDATE test_results
+        SET patient_notified_at = NOW()
+        WHERE result_id = @id
+        ''',
+        parameters: QueryParameters.named({'id': resultId}),
+      );
+
+      final item = await _getPaymentItemById(session, resultId);
+      if (item != null) {
+        await sendDummySms(
+          session,
+          mobileNumber: item.mobileNumber,
+          message:
+              'প্রিয় ${item.patientName}, আপনার payment received হয়েছে। ট্রানজ্যাকশন: ${item.transactionId ?? 'N/A'}',
+        );
+      }
+
+      return item;
+    } catch (e, st) {
+      session.log('Mark patient notified failed: $e',
+          level: LogLevel.error, stackTrace: st);
+      return null;
     }
   }
 
