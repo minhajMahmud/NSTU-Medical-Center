@@ -22,8 +22,14 @@ abstract class DoctorHomeData
     required this.doctorDesignation,
     this.doctorProfilePictureUrl,
     required this.today,
+    required this.todayPrescriptions,
+    required this.yesterdayPrescriptions,
     required this.lastMonthPrescriptions,
+    required this.previousMonthPrescriptions,
     required this.lastWeekPrescriptions,
+    required this.previousWeekPrescriptions,
+    this.nextFollowUpPatientName,
+    this.nextFollowUpNote,
     required this.recent,
     required this.reviewedReports,
   });
@@ -33,8 +39,14 @@ abstract class DoctorHomeData
     required String doctorDesignation,
     String? doctorProfilePictureUrl,
     required DateTime today,
+    required int todayPrescriptions,
+    required int yesterdayPrescriptions,
     required int lastMonthPrescriptions,
+    required int previousMonthPrescriptions,
     required int lastWeekPrescriptions,
+    required int previousWeekPrescriptions,
+    String? nextFollowUpPatientName,
+    String? nextFollowUpNote,
     required List<_i2.DoctorHomeRecentItem> recent,
     required List<_i3.DoctorHomeReviewedReport> reviewedReports,
   }) = _DoctorHomeDataImpl;
@@ -46,9 +58,19 @@ abstract class DoctorHomeData
       doctorProfilePictureUrl:
           jsonSerialization['doctorProfilePictureUrl'] as String?,
       today: _i1.DateTimeJsonExtension.fromJson(jsonSerialization['today']),
+      todayPrescriptions: jsonSerialization['todayPrescriptions'] as int,
+      yesterdayPrescriptions:
+          jsonSerialization['yesterdayPrescriptions'] as int,
       lastMonthPrescriptions:
           jsonSerialization['lastMonthPrescriptions'] as int,
+      previousMonthPrescriptions:
+          jsonSerialization['previousMonthPrescriptions'] as int,
       lastWeekPrescriptions: jsonSerialization['lastWeekPrescriptions'] as int,
+      previousWeekPrescriptions:
+          jsonSerialization['previousWeekPrescriptions'] as int,
+      nextFollowUpPatientName:
+          jsonSerialization['nextFollowUpPatientName'] as String?,
+      nextFollowUpNote: jsonSerialization['nextFollowUpNote'] as String?,
       recent: _i4.Protocol().deserialize<List<_i2.DoctorHomeRecentItem>>(
         jsonSerialization['recent'],
       ),
@@ -67,9 +89,21 @@ abstract class DoctorHomeData
 
   DateTime today;
 
+  int todayPrescriptions;
+
+  int yesterdayPrescriptions;
+
   int lastMonthPrescriptions;
 
+  int previousMonthPrescriptions;
+
   int lastWeekPrescriptions;
+
+  int previousWeekPrescriptions;
+
+  String? nextFollowUpPatientName;
+
+  String? nextFollowUpNote;
 
   List<_i2.DoctorHomeRecentItem> recent;
 
@@ -83,8 +117,14 @@ abstract class DoctorHomeData
     String? doctorDesignation,
     String? doctorProfilePictureUrl,
     DateTime? today,
+    int? todayPrescriptions,
+    int? yesterdayPrescriptions,
     int? lastMonthPrescriptions,
+    int? previousMonthPrescriptions,
     int? lastWeekPrescriptions,
+    int? previousWeekPrescriptions,
+    String? nextFollowUpPatientName,
+    String? nextFollowUpNote,
     List<_i2.DoctorHomeRecentItem>? recent,
     List<_i3.DoctorHomeReviewedReport>? reviewedReports,
   });
@@ -97,8 +137,15 @@ abstract class DoctorHomeData
       if (doctorProfilePictureUrl != null)
         'doctorProfilePictureUrl': doctorProfilePictureUrl,
       'today': today.toJson(),
+      'todayPrescriptions': todayPrescriptions,
+      'yesterdayPrescriptions': yesterdayPrescriptions,
       'lastMonthPrescriptions': lastMonthPrescriptions,
+      'previousMonthPrescriptions': previousMonthPrescriptions,
       'lastWeekPrescriptions': lastWeekPrescriptions,
+      'previousWeekPrescriptions': previousWeekPrescriptions,
+      if (nextFollowUpPatientName != null)
+        'nextFollowUpPatientName': nextFollowUpPatientName,
+      if (nextFollowUpNote != null) 'nextFollowUpNote': nextFollowUpNote,
       'recent': recent.toJson(valueToJson: (v) => v.toJson()),
       'reviewedReports': reviewedReports.toJson(valueToJson: (v) => v.toJson()),
     };
@@ -113,8 +160,15 @@ abstract class DoctorHomeData
       if (doctorProfilePictureUrl != null)
         'doctorProfilePictureUrl': doctorProfilePictureUrl,
       'today': today.toJson(),
+      'todayPrescriptions': todayPrescriptions,
+      'yesterdayPrescriptions': yesterdayPrescriptions,
       'lastMonthPrescriptions': lastMonthPrescriptions,
+      'previousMonthPrescriptions': previousMonthPrescriptions,
       'lastWeekPrescriptions': lastWeekPrescriptions,
+      'previousWeekPrescriptions': previousWeekPrescriptions,
+      if (nextFollowUpPatientName != null)
+        'nextFollowUpPatientName': nextFollowUpPatientName,
+      if (nextFollowUpNote != null) 'nextFollowUpNote': nextFollowUpNote,
       'recent': recent.toJson(valueToJson: (v) => v.toJsonForProtocol()),
       'reviewedReports': reviewedReports.toJson(
         valueToJson: (v) => v.toJsonForProtocol(),
@@ -136,8 +190,14 @@ class _DoctorHomeDataImpl extends DoctorHomeData {
     required String doctorDesignation,
     String? doctorProfilePictureUrl,
     required DateTime today,
+    required int todayPrescriptions,
+    required int yesterdayPrescriptions,
     required int lastMonthPrescriptions,
+    required int previousMonthPrescriptions,
     required int lastWeekPrescriptions,
+    required int previousWeekPrescriptions,
+    String? nextFollowUpPatientName,
+    String? nextFollowUpNote,
     required List<_i2.DoctorHomeRecentItem> recent,
     required List<_i3.DoctorHomeReviewedReport> reviewedReports,
   }) : super._(
@@ -145,8 +205,14 @@ class _DoctorHomeDataImpl extends DoctorHomeData {
          doctorDesignation: doctorDesignation,
          doctorProfilePictureUrl: doctorProfilePictureUrl,
          today: today,
+         todayPrescriptions: todayPrescriptions,
+         yesterdayPrescriptions: yesterdayPrescriptions,
          lastMonthPrescriptions: lastMonthPrescriptions,
+         previousMonthPrescriptions: previousMonthPrescriptions,
          lastWeekPrescriptions: lastWeekPrescriptions,
+         previousWeekPrescriptions: previousWeekPrescriptions,
+         nextFollowUpPatientName: nextFollowUpPatientName,
+         nextFollowUpNote: nextFollowUpNote,
          recent: recent,
          reviewedReports: reviewedReports,
        );
@@ -160,8 +226,14 @@ class _DoctorHomeDataImpl extends DoctorHomeData {
     String? doctorDesignation,
     Object? doctorProfilePictureUrl = _Undefined,
     DateTime? today,
+    int? todayPrescriptions,
+    int? yesterdayPrescriptions,
     int? lastMonthPrescriptions,
+    int? previousMonthPrescriptions,
     int? lastWeekPrescriptions,
+    int? previousWeekPrescriptions,
+    Object? nextFollowUpPatientName = _Undefined,
+    Object? nextFollowUpNote = _Undefined,
     List<_i2.DoctorHomeRecentItem>? recent,
     List<_i3.DoctorHomeReviewedReport>? reviewedReports,
   }) {
@@ -172,10 +244,23 @@ class _DoctorHomeDataImpl extends DoctorHomeData {
           ? doctorProfilePictureUrl
           : this.doctorProfilePictureUrl,
       today: today ?? this.today,
+      todayPrescriptions: todayPrescriptions ?? this.todayPrescriptions,
+      yesterdayPrescriptions:
+          yesterdayPrescriptions ?? this.yesterdayPrescriptions,
       lastMonthPrescriptions:
           lastMonthPrescriptions ?? this.lastMonthPrescriptions,
+      previousMonthPrescriptions:
+          previousMonthPrescriptions ?? this.previousMonthPrescriptions,
       lastWeekPrescriptions:
           lastWeekPrescriptions ?? this.lastWeekPrescriptions,
+      previousWeekPrescriptions:
+          previousWeekPrescriptions ?? this.previousWeekPrescriptions,
+      nextFollowUpPatientName: nextFollowUpPatientName is String?
+          ? nextFollowUpPatientName
+          : this.nextFollowUpPatientName,
+      nextFollowUpNote: nextFollowUpNote is String?
+          ? nextFollowUpNote
+          : this.nextFollowUpNote,
       recent: recent ?? this.recent.map((e0) => e0.copyWith()).toList(),
       reviewedReports:
           reviewedReports ??

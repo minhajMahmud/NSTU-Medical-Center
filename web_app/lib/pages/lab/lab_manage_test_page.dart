@@ -16,7 +16,6 @@ class _LabManageTestPageState extends State<LabManageTestPage> {
 
   bool _loading = true;
   String _search = '';
-  String _categoryFilter = 'Alls';
 
   final Set<int> _selectedIds = <int>{};
   List<LabTests> _tests = <LabTests>[];
@@ -254,11 +253,6 @@ class _LabManageTestPageState extends State<LabManageTestPage> {
           return false;
         }
       }
-      if (_categoryFilter != 'Alls') {
-        return t.description.toLowerCase().contains(
-          _categoryFilter.toLowerCase(),
-        );
-      }
       return true;
     }).toList();
 
@@ -299,48 +293,12 @@ class _LabManageTestPageState extends State<LabManageTestPage> {
                           child: TextField(
                             onChanged: (v) => setState(() => _search = v),
                             decoration: InputDecoration(
-                              hintText: 'Search Tests, Category, etc.',
+                              hintText: 'Search tests...',
                               prefixIcon: const Icon(Icons.search),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               isDense: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE5E7EB)),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _categoryFilter,
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'Alls',
-                                  child: Text('Alls'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Blood',
-                                  child: Text('Blood'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Lipid',
-                                  child: Text('Lipid'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Urgent',
-                                  child: Text('Urgent'),
-                                ),
-                              ],
-                              onChanged: (v) {
-                                if (v != null) {
-                                  setState(() => _categoryFilter = v);
-                                }
-                              },
                             ),
                           ),
                         ),
@@ -392,7 +350,7 @@ class _LabManageTestPageState extends State<LabManageTestPage> {
                                 child: SingleChildScrollView(
                                   scrollDirection: Axis.horizontal,
                                   child: SizedBox(
-                                    width: 980,
+                                    width: 860,
                                     child: ListView.builder(
                                       itemCount: filtered.length + 1,
                                       itemBuilder: (context, index) {
@@ -442,14 +400,6 @@ class _LabManageTestPageState extends State<LabManageTestPage> {
                                                 SizedBox(
                                                   width: 200,
                                                   child: Text(t.testName),
-                                                ),
-                                                SizedBox(
-                                                  width: 120,
-                                                  child: Text(
-                                                    _categoryFromDescription(
-                                                      t.description,
-                                                    ),
-                                                  ),
                                                 ),
                                                 SizedBox(
                                                   width: 110,
@@ -590,15 +540,6 @@ class _LabManageTestPageState extends State<LabManageTestPage> {
             ),
     );
   }
-
-  String _categoryFromDescription(String description) {
-    final d = description.toLowerCase();
-    if (d.contains('blood')) return 'Blood';
-    if (d.contains('lipid')) return 'Lipid';
-    if (d.contains('urgent')) return 'Urgent';
-    if (d.contains('general')) return 'General';
-    return 'Category';
-  }
 }
 
 class _ManageHeaderRow extends StatelessWidget {
@@ -616,13 +557,6 @@ class _ManageHeaderRow extends StatelessWidget {
             width: 200,
             child: Text(
               'Test Name',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-          SizedBox(
-            width: 120,
-            child: Text(
-              'Category',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),

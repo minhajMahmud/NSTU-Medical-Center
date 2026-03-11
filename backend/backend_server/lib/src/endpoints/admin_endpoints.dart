@@ -4,6 +4,7 @@ import 'package:serverpod/serverpod.dart';
 import 'dart:async'; // added for fire-and-forget scheduling
 import 'auth_endpoint.dart';
 import '../generated/protocol.dart';
+import '../utils/auth_user.dart';
 
 /// AdminEndpoints: server-side methods used by the admin UI to manage users,
 /// inventory, rosters, audit logs and notifications.
@@ -497,6 +498,7 @@ class AdminEndpoints extends Endpoint {
     String userId,
   ) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       final result = await session.db.unsafeQuery(
         '''
   SELECT 
@@ -508,9 +510,9 @@ class AdminEndpoints extends Endpoint {
     sp.qualification
   FROM users u
   LEFT JOIN staff_profiles sp ON sp.user_id = u.user_id
-  WHERE u.email = @e
+    WHERE u.user_id = @id
   ''',
-        parameters: QueryParameters.named({'e': userId}),
+        parameters: QueryParameters.named({'id': resolvedUserId}),
       );
 
       if (result.isEmpty) return null;
@@ -544,6 +546,7 @@ class AdminEndpoints extends Endpoint {
       String? designation,
       String? qualification) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       await session.db.unsafeExecute('BEGIN');
 
       String? profilePictureUrl;
@@ -565,10 +568,10 @@ class AdminEndpoints extends Endpoint {
         SET name = @name,
             phone = @phone,
             profile_picture_url = COALESCE(@ppurl, profile_picture_url)
-        WHERE email = @e
+        WHERE user_id = @id
         ''',
         parameters: QueryParameters.named({
-          'e': userId,
+          'id': resolvedUserId,
           'name': name,
           'phone': phone,
           'ppurl': profilePictureUrl,
@@ -576,14 +579,14 @@ class AdminEndpoints extends Endpoint {
       );
       await session.db.unsafeExecute('''
             INSERT INTO staff_profiles (user_id, designation, qualification)
-            VALUES ((SELECT user_id FROM users WHERE email = @e), @d, @q)
+            VALUES (@id, @d, @q)
             ON CONFLICT (user_id)
             DO UPDATE SET
             designation = EXCLUDED.designation,
             qualification = EXCLUDED.qualification
             ''',
           parameters: QueryParameters.named({
-            'e': userId,
+            'id': resolvedUserId,
             'd': designation,
             'q': qualification,
           }));

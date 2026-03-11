@@ -33,6 +33,7 @@ class DashboardSidebar extends StatelessWidget {
     final items = _itemsForRole(role);
     final path = GoRouterState.of(context).uri.path;
     final selected = _indexFromLocation(path, items);
+    final auth = context.read<AuthController>();
 
     return NavigationRail(
       selectedIndex: selected,
@@ -40,6 +41,25 @@ class DashboardSidebar extends StatelessWidget {
         context.go(items[index].route);
       },
       labelType: NavigationRailLabelType.all,
+      trailing: Expanded(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Tooltip(
+              message: 'Logout',
+              child: IconButton(
+                onPressed: () async {
+                  await auth.logout();
+                  if (context.mounted) context.go('/login');
+                },
+                icon: const Icon(Icons.logout_rounded),
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ),
+      ),
       destinations: [
         for (final item in items)
           NavigationRailDestination(
@@ -116,20 +136,32 @@ class DashboardSidebar extends StatelessWidget {
           _NavItem(
             route: '/doctor/dashboard',
             label: 'Dashboard',
-            icon: Icons.local_hospital_outlined,
-            selectedIcon: Icons.local_hospital,
+            icon: Icons.dashboard_outlined,
+            selectedIcon: Icons.dashboard,
           ),
           _NavItem(
-            route: '/doctor/prescriptions',
-            label: 'Prescriptions',
+            route: '/doctor/patients',
+            label: 'Patients',
+            icon: Icons.groups_outlined,
+            selectedIcon: Icons.groups,
+          ),
+          _NavItem(
+            route: '/doctor/appointments',
+            label: 'Appointments',
+            icon: Icons.calendar_month_outlined,
+            selectedIcon: Icons.calendar_month,
+          ),
+          _NavItem(
+            route: '/doctor/reports',
+            label: 'Reports',
             icon: Icons.description_outlined,
             selectedIcon: Icons.description,
           ),
           _NavItem(
-            route: '/doctor/records',
-            label: 'Records',
-            icon: Icons.folder_shared_outlined,
-            selectedIcon: Icons.folder_shared,
+            route: '/doctor/profile',
+            label: 'Profile',
+            icon: Icons.person_outline,
+            selectedIcon: Icons.person,
           ),
         ];
       case AppRole.admin:
@@ -214,6 +246,7 @@ class _LabDashboardSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
+    final auth = context.read<AuthController>();
 
     final items = const [
       _NavItem(
@@ -251,12 +284,6 @@ class _LabDashboardSidebar extends StatelessWidget {
         label: 'Analytics',
         icon: Icons.analytics_outlined,
         selectedIcon: Icons.analytics,
-      ),
-      _NavItem(
-        route: '/lab/settings',
-        label: 'Settings',
-        icon: Icons.settings_outlined,
-        selectedIcon: Icons.settings,
       ),
       _NavItem(
         route: '/lab/support',
@@ -342,6 +369,43 @@ class _LabDashboardSidebar extends StatelessWidget {
                     onTap: () => context.go(item.route),
                   );
                 },
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Column(
+                children: [
+                  ListTile(
+                    dense: true,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    selected: path.startsWith('/lab/settings'),
+                    selectedTileColor: const Color(0xFFE8F1FF),
+                    leading: const Icon(Icons.settings_outlined),
+                    title: const Text('Settings'),
+                    onTap: () => context.go('/lab/settings'),
+                  ),
+                  ListTile(
+                    dense: true,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    leading: const Icon(
+                      Icons.logout_rounded,
+                      color: Colors.red,
+                    ),
+                    title: const Text(
+                      'Logout',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    onTap: () async {
+                      await auth.logout();
+                      if (context.mounted) context.go('/login');
+                    },
+                  ),
+                ],
               ),
             ),
           ],

@@ -25,7 +25,7 @@ class DispenserEndpoint extends Endpoint {
         LEFT JOIN staff_profiles s 
           ON s.user_id = u.user_id
         WHERE u.user_id = @userId
-          AND u.role = 'DISPENSER'
+          AND LOWER(u.role::text) = 'dispenser'
         ''',
         parameters: QueryParameters.named({'userId': resolvedUserId}),
       );
@@ -63,10 +63,11 @@ class DispenserEndpoint extends Endpoint {
   }) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
-      final imageUrl = (profilePictureUrl != null &&
-              (profilePictureUrl.startsWith('http://') ||
-                  profilePictureUrl.startsWith('https://')))
-          ? profilePictureUrl
+      final rawImageUrl = profilePictureUrl?.trim();
+      final imageUrl = (rawImageUrl != null &&
+              (rawImageUrl.startsWith('http://') ||
+                  rawImageUrl.startsWith('https://')))
+          ? rawImageUrl
           : null;
 
       return await session.db.transaction((transaction) async {
@@ -78,7 +79,7 @@ class DispenserEndpoint extends Endpoint {
           phone = @phone,
           profile_picture_url = COALESCE(@url, profile_picture_url)
         WHERE user_id = @id
-          AND role = 'DISPENSER'
+          AND LOWER(role::text) = 'dispenser'
         ''',
           parameters: QueryParameters.named({
             'id': resolvedUserId,
@@ -103,7 +104,7 @@ class DispenserEndpoint extends Endpoint {
           }),
         );
 
-        return 'Dispenser profile updated successfully';
+        return 'OK';
       });
     } catch (e, stack) {
       session.log('Error updating dispenser profile: $e',

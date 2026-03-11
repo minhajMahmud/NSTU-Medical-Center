@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/role_dashboard_controller.dart';
 import '../../widgets/common/app_data_table.dart';
 import '../../widgets/common/dashboard_shell.dart';
 
-class DoctorPrescriptionsPage extends StatefulWidget {
-  const DoctorPrescriptionsPage({super.key});
+class DoctorReportsPage extends StatefulWidget {
+  const DoctorReportsPage({super.key});
 
   @override
-  State<DoctorPrescriptionsPage> createState() =>
-      _DoctorPrescriptionsPageState();
+  State<DoctorReportsPage> createState() => _DoctorReportsPageState();
 }
 
-class _DoctorPrescriptionsPageState extends State<DoctorPrescriptionsPage> {
+class _DoctorReportsPageState extends State<DoctorReportsPage> {
   @override
   void initState() {
     super.initState();
@@ -27,6 +25,7 @@ class _DoctorPrescriptionsPageState extends State<DoctorPrescriptionsPage> {
   @override
   Widget build(BuildContext context) {
     final c = context.watch<RoleDashboardController>();
+    final reports = c.doctorHome?.reviewedReports ?? const [];
 
     return DashboardShell(
       child: c.isLoading
@@ -34,33 +33,33 @@ class _DoctorPrescriptionsPageState extends State<DoctorPrescriptionsPage> {
           : ListView(
               children: [
                 Text(
-                  'Doctor • Appointments',
+                  'Doctor • Reports',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 12),
                 AppDataTable(
                   columns: const [
-                    DataColumn(label: Text('Prescription ID')),
+                    DataColumn(label: Text('Report Type')),
                     DataColumn(label: Text('Patient')),
-                    DataColumn(label: Text('Phone')),
-                    DataColumn(label: Text('Date')),
+                    DataColumn(label: Text('Prescription')),
+                    DataColumn(label: Text('Time')),
                   ],
-                  rows: c.doctorPrescriptionList
+                  rows: reports
                       .map(
-                        (p) => DataRow(
+                        (r) => DataRow(
                           cells: [
-                            DataCell(Text(p.prescriptionId.toString())),
-                            DataCell(Text(p.name)),
-                            DataCell(Text(p.mobileNumber ?? '-')),
+                            DataCell(
+                              Text(r.type.isEmpty ? 'Lab Result' : r.type),
+                            ),
                             DataCell(
                               Text(
-                                p.prescriptionDate == null
+                                r.uploadedByName.isEmpty
                                     ? '-'
-                                    : DateFormat(
-                                        'dd MMM yyyy',
-                                      ).format(p.prescriptionDate!),
+                                    : r.uploadedByName,
                               ),
                             ),
+                            DataCell(Text(r.prescriptionId?.toString() ?? '-')),
+                            DataCell(Text(r.timeAgo)),
                           ],
                         ),
                       )

@@ -71,6 +71,21 @@ class DoctorEndpoint extends Endpoint {
           ? (lastMonthRows.first.toColumnMap()['total'] as int? ?? 0)
           : 0;
 
+      final previousMonthRows = await session.db.unsafeQuery(
+        r'''
+        SELECT COUNT(*)::int AS total
+        FROM prescriptions
+        WHERE doctor_id = @id
+          AND prescription_date >= (CURRENT_DATE - INTERVAL '2 month')
+          AND prescription_date < (CURRENT_DATE - INTERVAL '1 month')
+        ''',
+        parameters: QueryParameters.named({'id': resolvedDoctorId}),
+      );
+
+      final previousMonthPrescriptions = previousMonthRows.isNotEmpty
+          ? (previousMonthRows.first.toColumnMap()['total'] as int? ?? 0)
+          : 0;
+
       // Last 7 days inclusive => CURRENT_DATE - 6 days
       final lastWeekRows = await session.db.unsafeQuery(
         r'''
@@ -84,6 +99,49 @@ class DoctorEndpoint extends Endpoint {
 
       final lastWeekPrescriptions = lastWeekRows.isNotEmpty
           ? (lastWeekRows.first.toColumnMap()['total'] as int? ?? 0)
+          : 0;
+
+      final previousWeekRows = await session.db.unsafeQuery(
+        r'''
+        SELECT COUNT(*)::int AS total
+        FROM prescriptions
+        WHERE doctor_id = @id
+          AND prescription_date >= (CURRENT_DATE - INTERVAL '13 days')
+          AND prescription_date < (CURRENT_DATE - INTERVAL '6 days')
+        ''',
+        parameters: QueryParameters.named({'id': resolvedDoctorId}),
+      );
+
+      final previousWeekPrescriptions = previousWeekRows.isNotEmpty
+          ? (previousWeekRows.first.toColumnMap()['total'] as int? ?? 0)
+          : 0;
+
+      final todayRows = await session.db.unsafeQuery(
+        r'''
+        SELECT COUNT(*)::int AS total
+        FROM prescriptions
+        WHERE doctor_id = @id
+          AND prescription_date = CURRENT_DATE
+        ''',
+        parameters: QueryParameters.named({'id': resolvedDoctorId}),
+      );
+
+      final todayPrescriptions = todayRows.isNotEmpty
+          ? (todayRows.first.toColumnMap()['total'] as int? ?? 0)
+          : 0;
+
+      final yesterdayRows = await session.db.unsafeQuery(
+        r'''
+        SELECT COUNT(*)::int AS total
+        FROM prescriptions
+        WHERE doctor_id = @id
+          AND prescription_date = (CURRENT_DATE - INTERVAL '1 day')::date
+        ''',
+        parameters: QueryParameters.named({'id': resolvedDoctorId}),
+      );
+
+      final yesterdayPrescriptions = yesterdayRows.isNotEmpty
+          ? (yesterdayRows.first.toColumnMap()['total'] as int? ?? 0)
           : 0;
 
       final now = DateTime.now();
@@ -162,14 +220,47 @@ class DoctorEndpoint extends Endpoint {
         );
       }
 
+      final nextFollowUpRows = await session.db.unsafeQuery(
+        r'''
+        SELECT name, next_visit, prescription_id, prescription_date
+        FROM prescriptions
+        WHERE doctor_id = @id
+          AND COALESCE(TRIM(next_visit), '') <> ''
+        ORDER BY prescription_date DESC NULLS LAST, prescription_id DESC
+        LIMIT 1
+        ''',
+        parameters: QueryParameters.named({'id': resolvedDoctorId}),
+      );
+
+      String? nextFollowUpPatientName;
+      String? nextFollowUpNote;
+      if (nextFollowUpRows.isNotEmpty) {
+        final map = nextFollowUpRows.first.toColumnMap();
+        nextFollowUpPatientName = _s(map['name']);
+        final rawNote = _s(map['next_visit']);
+        final rawDate = map['prescription_date'] as DateTime?;
+        final dateLabel = rawDate == null
+            ? ''
+            : '${rawDate.day}/${rawDate.month}/${rawDate.year}';
+        nextFollowUpNote = rawNote.isEmpty
+            ? dateLabel
+            : (dateLabel.isEmpty ? rawNote : '$rawNote • $dateLabel');
+      }
+
       return DoctorHomeData(
         doctorName: doctorName,
         doctorDesignation: friendlyRole(doctorRoleRaw),
         doctorProfilePictureUrl:
             doctorProfilePictureUrl.isEmpty ? null : doctorProfilePictureUrl,
         today: DateTime.now().toUtc(),
+        todayPrescriptions: todayPrescriptions,
+        yesterdayPrescriptions: yesterdayPrescriptions,
         lastMonthPrescriptions: lastMonthPrescriptions,
+        previousMonthPrescriptions: previousMonthPrescriptions,
         lastWeekPrescriptions: lastWeekPrescriptions,
+        previousWeekPrescriptions: previousWeekPrescriptions,
+        nextFollowUpPatientName: nextFollowUpPatientName,
+        nextFollowUpNote: nextFollowUpNote,
         recent: recent,
         reviewedReports: reviewedReports,
       );
@@ -185,8 +276,14 @@ class DoctorEndpoint extends Endpoint {
         doctorDesignation: '',
         doctorProfilePictureUrl: null,
         today: DateTime.now().toUtc(),
+        todayPrescriptions: 0,
+        yesterdayPrescriptions: 0,
         lastMonthPrescriptions: 0,
+        previousMonthPrescriptions: 0,
         lastWeekPrescriptions: 0,
+        previousWeekPrescriptions: 0,
+        nextFollowUpPatientName: null,
+        nextFollowUpNote: null,
         recent: const [],
         reviewedReports: const [],
       );

@@ -1,9 +1,34 @@
 import 'package:backend_client/backend_client.dart';
+import 'dart:convert';
 
 import 'api_service.dart';
 
 class RoleDashboardService {
   final _client = ApiService.instance.client;
+  final _keyManager = ApiService.instance.authKeyManager;
+
+  String? _currentEmailFromToken(String? token) {
+    if (token == null || token.isEmpty) return null;
+    final parts = token.split('.');
+    if (parts.length != 3) return null;
+    try {
+      final normalized = base64Url.normalize(parts[1]);
+      final payload = utf8.decode(base64Url.decode(normalized));
+      final map = jsonDecode(payload);
+      if (map is Map<String, dynamic>) {
+        final sub = map['sub'];
+        return sub?.toString();
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _getCurrentEmail() async {
+    final token = await _keyManager.get();
+    return _currentEmailFromToken(token);
+  }
 
   // Patient
   Future<PatientProfile?> getPatientProfile() =>
@@ -40,6 +65,25 @@ class RoleDashboardService {
 
   // Doctor
   Future<DoctorHomeData> getDoctorHome() => _client.doctor.getDoctorHomeData();
+  Future<DoctorProfile?> getDoctorProfile() =>
+      _client.doctor.getDoctorProfile(0);
+  Future<bool> updateDoctorProfile({
+    required String name,
+    required String email,
+    required String phone,
+    required String qualification,
+    required String designation,
+    String? profilePictureUrl,
+  }) => _client.doctor.updateDoctorProfile(
+    0,
+    name,
+    email,
+    phone,
+    profilePictureUrl,
+    designation,
+    qualification,
+    null,
+  );
   Future<List<PatientPrescriptionListItem>> getDoctorPrescriptions({
     String? query,
     int limit = 30,
@@ -62,6 +106,31 @@ class RoleDashboardService {
   }) => _client.adminEndpoints.listUsersByRole(role, limit);
   Future<List<InventoryItemInfo>> getAdminInventory() =>
       _client.adminInventoryEndpoints.listInventoryItems();
+  Future<AdminProfileRespond?> getAdminProfile() async {
+    final email = await _getCurrentEmail();
+    if (email == null || email.isEmpty) return null;
+    return _client.adminEndpoints.getAdminProfile(email);
+  }
+
+  Future<String> updateAdminProfile({
+    required String name,
+    required String phone,
+    String? designation,
+    String? qualification,
+    String? profilePictureUrl,
+  }) async {
+    final email = await _getCurrentEmail();
+    if (email == null || email.isEmpty)
+      return 'Unable to resolve current user email';
+    return _client.adminEndpoints.updateAdminProfile(
+      email,
+      name,
+      phone,
+      profilePictureUrl,
+      designation,
+      qualification,
+    );
+  }
 
   // Lab
   Future<LabToday> getLabSummary() => _client.lab.getLabHomeTwoDaySummary();
@@ -70,10 +139,56 @@ class RoleDashboardService {
   Future<List<TestResult>> getAllLabResults() =>
       _client.lab.getAllTestResults();
   Future<List<LabTests>> getAllLabTests() => _client.lab.getAllLabTests();
+  Future<LabAnalyticsSnapshot> getLabAnalyticsSnapshot({
+    DateTime? fromDate,
+    DateTime? toDateExclusive,
+    String patientType = 'ALL',
+  }) => _client.lab.getAnalyticsSnapshot(
+    fromDate: fromDate,
+    toDateExclusive: toDateExclusive,
+    patientType: patientType,
+  );
+  Future<StaffProfileDto?> getLabStaffProfile() =>
+      _client.lab.getStaffProfile();
+  Future<bool> updateLabStaffProfile({
+    required String name,
+    required String email,
+    required String phone,
+    required String qualification,
+    required String designation,
+    String? profilePictureUrl,
+  }) => _client.lab.updateStaffProfile(
+    name: name,
+    phone: phone,
+    email: email,
+    designation: designation,
+    qualification: qualification,
+    profilePictureUrl: profilePictureUrl,
+  );
+  Future<String> changeMyPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) => _client.password.changePassword(
+    currentPassword: currentPassword,
+    newPassword: newPassword,
+  );
 
   // Dispenser
   Future<DispenserProfileR?> getDispenserProfile() =>
       _client.dispenser.getDispenserProfile();
+  Future<String> updateDispenserProfile({
+    required String name,
+    required String phone,
+    required String qualification,
+    required String designation,
+    String? profilePictureUrl,
+  }) => _client.dispenser.updateDispenserProfile(
+    name: name,
+    phone: phone,
+    qualification: qualification,
+    designation: designation,
+    profilePictureUrl: profilePictureUrl,
+  );
   Future<List<InventoryItemInfo>> getDispenserStock() =>
       _client.dispenser.listInventoryItems();
   Future<List<DispenseHistoryEntry>> getDispenserHistory() =>

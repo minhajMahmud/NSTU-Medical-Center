@@ -2047,6 +2047,37 @@ class Endpoints extends _i1.EndpointDispatch {
       name: 'lab',
       endpoint: endpoints['lab']!,
       methodConnectors: {
+        'getAnalyticsSnapshot': _i1.MethodConnector(
+          name: 'getAnalyticsSnapshot',
+          params: {
+            'fromDate': _i1.ParameterDescription(
+              name: 'fromDate',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+            'toDateExclusive': _i1.ParameterDescription(
+              name: 'toDateExclusive',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+            'patientType': _i1.ParameterDescription(
+              name: 'patientType',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['lab'] as _i8.LabEndpoint).getAnalyticsSnapshot(
+                    session,
+                    fromDate: params['fromDate'],
+                    toDateExclusive: params['toDateExclusive'],
+                    patientType: params['patientType'],
+                  ),
+        ),
         'getAllLabTests': _i1.MethodConnector(
           name: 'getAllLabTests',
           params: {},

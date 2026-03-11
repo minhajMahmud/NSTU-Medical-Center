@@ -75,6 +75,7 @@ doctor:
   - getPatientPrescriptionList:
   - getPrescriptionDetails:
 lab:
+  - getAnalyticsSnapshot:
   - getAllLabTests:
   - createTestResult:
   - createLabTest:

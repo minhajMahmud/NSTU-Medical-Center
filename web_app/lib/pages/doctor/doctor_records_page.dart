@@ -32,7 +32,7 @@ class _DoctorRecordsPageState extends State<DoctorRecordsPage> {
           : ListView(
               children: [
                 Text(
-                  'Doctor • Patient Records',
+                  'Doctor • Patients',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 12),

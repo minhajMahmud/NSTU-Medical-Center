@@ -12,8 +12,10 @@ import '../../pages/dispenser/dispenser_dashboard_page.dart';
 import '../../pages/dispenser/dispenser_history_page.dart';
 import '../../pages/dispenser/dispenser_stock_page.dart';
 import '../../pages/doctor/doctor_dashboard_page.dart';
+import '../../pages/doctor/doctor_profile_page.dart';
 import '../../pages/doctor/doctor_prescriptions_page.dart';
 import '../../pages/doctor/doctor_records_page.dart';
+import '../../pages/doctor/doctor_reports_page.dart';
 import '../../pages/home/landing_page.dart';
 import '../../pages/lab/lab_dashboard_page.dart';
 import '../../pages/lab/lab_manage_test_page.dart';
@@ -135,6 +137,22 @@ GoRouter createAppRouter(AuthController auth) {
       GoRoute(
         path: '/doctor/dashboard',
         builder: (_, __) => const DoctorDashboardPage(),
+      ),
+      GoRoute(
+        path: '/doctor/patients',
+        builder: (_, __) => const DoctorRecordsPage(),
+      ),
+      GoRoute(
+        path: '/doctor/appointments',
+        builder: (_, __) => const DoctorPrescriptionsPage(),
+      ),
+      GoRoute(
+        path: '/doctor/reports',
+        builder: (_, __) => const DoctorReportsPage(),
+      ),
+      GoRoute(
+        path: '/doctor/profile',
+        builder: (_, __) => const DoctorProfilePage(),
       ),
       GoRoute(
         path: '/doctor/prescriptions',

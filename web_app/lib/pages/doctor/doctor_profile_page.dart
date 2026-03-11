@@ -1,23 +1,21 @@
-import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/role_dashboard_controller.dart';
-import '../../widgets/common/app_data_table.dart';
+import '../../utils/cloudinary_upload.dart';
 import '../../widgets/common/change_password_dialog.dart';
 import '../../widgets/common/dashboard_shell.dart';
 import '../../widgets/common/role_profile_form_card.dart';
-import '../../utils/cloudinary_upload.dart';
 
-class DispenserDashboardPage extends StatefulWidget {
-  const DispenserDashboardPage({super.key});
+class DoctorProfilePage extends StatefulWidget {
+  const DoctorProfilePage({super.key});
 
   @override
-  State<DispenserDashboardPage> createState() => _DispenserDashboardPageState();
+  State<DoctorProfilePage> createState() => _DoctorProfilePageState();
 }
 
-class _DispenserDashboardPageState extends State<DispenserDashboardPage> {
+class _DoctorProfilePageState extends State<DoctorProfilePage> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
@@ -32,7 +30,7 @@ class _DispenserDashboardPageState extends State<DispenserDashboardPage> {
     super.initState();
     Future.microtask(() {
       if (!mounted) return;
-      context.read<RoleDashboardController>().loadDispenser();
+      context.read<RoleDashboardController>().loadDoctor();
     });
   }
 
@@ -97,23 +95,12 @@ class _DispenserDashboardPageState extends State<DispenserDashboardPage> {
   }
 
   Future<void> _saveProfile(RoleDashboardController c) async {
-    final name = _nameCtrl.text.trim();
-    final phone = _phoneCtrl.text.trim();
-    final qualification = _qualificationCtrl.text.trim();
-    final designation = _designationCtrl.text.trim();
-
-    if ([name, phone, qualification, designation].any((e) => e.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All fields except email are required.')),
-      );
-      return;
-    }
-
-    final ok = await c.updateDispenserProfile(
-      name: name,
-      phone: phone,
-      qualification: qualification,
-      designation: designation,
+    final ok = await c.updateDoctorProfile(
+      name: _nameCtrl.text.trim(),
+      email: _emailCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim(),
+      qualification: _qualificationCtrl.text.trim(),
+      designation: _designationCtrl.text.trim(),
       profilePictureUrl: _profilePictureUrl,
     );
 
@@ -121,15 +108,11 @@ class _DispenserDashboardPageState extends State<DispenserDashboardPage> {
     if (ok) {
       setState(() => _isEditingProfile = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Dispenser profile updated successfully.'),
-        ),
+        const SnackBar(content: Text('Doctor profile updated successfully.')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(c.error ?? 'Failed to update dispenser profile.'),
-        ),
+        SnackBar(content: Text(c.error ?? 'Failed to update doctor profile.')),
       );
     }
   }
@@ -137,16 +120,16 @@ class _DispenserDashboardPageState extends State<DispenserDashboardPage> {
   @override
   Widget build(BuildContext context) {
     final c = context.watch<RoleDashboardController>();
-    final profile = c.dispenserProfile;
+    final profile = c.doctorProfile;
     _bindProfile(profile);
 
     return DashboardShell(
-      child: c.isLoading
+      child: c.isLoading && profile == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
                 Text(
-                  'Dispenser Dashboard',
+                  'Doctor • Profile',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 12),
@@ -159,7 +142,6 @@ class _DispenserDashboardPageState extends State<DispenserDashboardPage> {
                   phoneController: _phoneCtrl,
                   qualificationController: _qualificationCtrl,
                   designationController: _designationCtrl,
-                  emailEditable: false,
                   profileImageUrl: _profilePictureUrl,
                   isUploadingImage: _isUploadingPicture,
                   onUploadPicture: _isEditingProfile
@@ -182,56 +164,6 @@ class _DispenserDashboardPageState extends State<DispenserDashboardPage> {
                       setState(() => _isEditingProfile = true);
                     }
                   },
-                ),
-                const SizedBox(height: 12),
-                AppDataTable(
-                  columns: const [
-                    DataColumn(label: Text('Medicine')),
-                    DataColumn(label: Text('Category')),
-                    DataColumn(label: Text('Current Qty')),
-                    DataColumn(label: Text('Min Qty')),
-                  ],
-                  rows: c.dispenserStock
-                      .map(
-                        (s) => DataRow(
-                          cells: [
-                            DataCell(Text(s.itemName)),
-                            DataCell(Text(s.categoryName)),
-                            DataCell(Text('${s.currentQuantity} ${s.unit}')),
-                            DataCell(Text('${s.minimumStock} ${s.unit}')),
-                          ],
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Dispense History',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                AppDataTable(
-                  columns: const [
-                    DataColumn(label: Text('Dispense ID')),
-                    DataColumn(label: Text('Patient')),
-                    DataColumn(label: Text('Prescription')),
-                    DataColumn(label: Text('Date')),
-                  ],
-                  rows: c.dispenserHistory
-                      .map(
-                        (h) => DataRow(
-                          cells: [
-                            DataCell(Text(h.dispenseId.toString())),
-                            DataCell(Text(h.patientName)),
-                            DataCell(Text(h.prescriptionId.toString())),
-                            DataCell(
-                              Text(
-                                DateFormat('dd MMM yyyy').format(h.dispensedAt),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                      .toList(),
                 ),
               ],
             ),

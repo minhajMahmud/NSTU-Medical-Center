@@ -9,6 +9,237 @@ class LabEndpoint extends Endpoint {
   @override
   bool get requireLogin => true;
 
+  String _normalizeAnalyticsPatientType(String patientType) {
+    final t = patientType.trim().toUpperCase();
+    switch (t) {
+      case 'STUDENT':
+      case 'STAFF':
+      case 'OUTSIDE':
+      case 'URGENT':
+      case 'ALL':
+        return t;
+      default:
+        return 'ALL';
+    }
+  }
+
+  Future<LabAnalyticsSnapshot> getAnalyticsSnapshot(
+    Session session, {
+    DateTime? fromDate,
+    DateTime? toDateExclusive,
+    String patientType = 'ALL',
+  }) async {
+    try {
+      final normalizedType = _normalizeAnalyticsPatientType(patientType);
+
+      final whereConditions = <String>[
+        '''
+        (
+          @ptype::text = 'ALL'
+          OR CASE
+              WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%URGENT%' THEN 'URGENT'
+              WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%OUTSIDE%'
+                OR UPPER(COALESCE(tr.patient_type, '')) LIKE '%PUBLIC%' THEN 'OUTSIDE'
+              WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%TEACHER%'
+                OR UPPER(COALESCE(tr.patient_type, '')) LIKE '%STAFF%' THEN 'STAFF'
+              ELSE 'STUDENT'
+            END = @ptype::text
+        )
+        ''',
+      ];
+
+      final paramMap = <String, dynamic>{
+        'ptype': normalizedType,
+      };
+
+      if (fromDate != null) {
+        whereConditions.add('COALESCE(tr.created_at, NOW()) >= @fromDate');
+        paramMap['fromDate'] = fromDate;
+      }
+      if (toDateExclusive != null) {
+        whereConditions
+            .add('COALESCE(tr.created_at, NOW()) < @toDateExclusive');
+        paramMap['toDateExclusive'] = toDateExclusive;
+      }
+
+      final filterSql = '''
+        FROM test_results tr
+        LEFT JOIN lab_tests lt ON lt.test_id = tr.test_id
+        WHERE ${whereConditions.join(' AND ')}
+      ''';
+
+      final parameters = QueryParameters.named(paramMap);
+
+      final summaryRows = await session.db.unsafeQuery(
+        '''
+        SELECT
+          COUNT(*)::int AS total_results,
+          SUM(CASE WHEN tr.submitted_at IS NOT NULL THEN 1 ELSE 0 END)::int AS submitted_results,
+          SUM(CASE WHEN tr.submitted_at IS NULL THEN 1 ELSE 0 END)::int AS pending_results,
+          SUM(CASE
+                WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%URGENT%' THEN 1
+                ELSE 0
+              END)::int AS urgent_results,
+          COALESCE(AVG(CASE
+            WHEN tr.submitted_at IS NOT NULL
+              AND COALESCE(tr.created_at, tr.submitted_at) <= tr.submitted_at
+            THEN EXTRACT(EPOCH FROM (tr.submitted_at - COALESCE(tr.created_at, tr.submitted_at))) / 3600.0
+            ELSE NULL
+          END), 0)::double precision AS avg_tat_hours,
+          COALESCE(SUM(CASE
+            WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%OUTSIDE%'
+              OR UPPER(COALESCE(tr.patient_type, '')) LIKE '%PUBLIC%' THEN COALESCE(lt.outside_fee, 0)
+            WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%TEACHER%'
+              OR UPPER(COALESCE(tr.patient_type, '')) LIKE '%STAFF%' THEN COALESCE(lt.teacher_fee, 0)
+            ELSE COALESCE(lt.student_fee, 0)
+          END), 0)::double precision AS estimated_revenue,
+          COALESCE(SUM(CASE
+            WHEN tr.submitted_at IS NOT NULL THEN
+              CASE
+                WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%OUTSIDE%'
+                  OR UPPER(COALESCE(tr.patient_type, '')) LIKE '%PUBLIC%' THEN COALESCE(lt.outside_fee, 0)
+                WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%TEACHER%'
+                  OR UPPER(COALESCE(tr.patient_type, '')) LIKE '%STAFF%' THEN COALESCE(lt.teacher_fee, 0)
+                ELSE COALESCE(lt.student_fee, 0)
+              END
+            ELSE 0
+          END), 0)::double precision AS submitted_revenue
+        $filterSql
+        ''',
+        parameters: parameters,
+      );
+
+      final summary = summaryRows.isEmpty
+          ? <String, dynamic>{}
+          : summaryRows.first.toColumnMap();
+
+      final trendRows = await session.db.unsafeQuery(
+        '''
+        SELECT
+          DATE(COALESCE(tr.created_at, NOW()))::timestamp AS day,
+          COUNT(*)::int AS total,
+          SUM(CASE WHEN tr.submitted_at IS NOT NULL THEN 1 ELSE 0 END)::int AS submitted
+        $filterSql
+        GROUP BY DATE(COALESCE(tr.created_at, NOW()))
+        ORDER BY day ASC
+        ''',
+        parameters: parameters,
+      );
+
+      final topRows = await session.db.unsafeQuery(
+        '''
+        SELECT
+          COALESCE(lt.test_name, 'Test #' || tr.test_id::text) AS test_name,
+          COUNT(*)::int AS count
+        $filterSql
+        GROUP BY COALESCE(lt.test_name, 'Test #' || tr.test_id::text)
+        ORDER BY count DESC, test_name ASC
+        LIMIT 5
+        ''',
+        parameters: parameters,
+      );
+
+      final categoryRows = await session.db.unsafeQuery(
+        '''
+        SELECT
+          CASE
+            WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%URGENT%' THEN 'URGENT'
+            WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%OUTSIDE%'
+              OR UPPER(COALESCE(tr.patient_type, '')) LIKE '%PUBLIC%' THEN 'OUTSIDE'
+            WHEN UPPER(COALESCE(tr.patient_type, '')) LIKE '%TEACHER%'
+              OR UPPER(COALESCE(tr.patient_type, '')) LIKE '%STAFF%' THEN 'STAFF'
+            ELSE 'STUDENT'
+          END AS category,
+          COUNT(*)::int AS count
+        $filterSql
+        GROUP BY category
+        ORDER BY count DESC, category ASC
+        ''',
+        parameters: parameters,
+      );
+
+      final shiftRows = await session.db.unsafeQuery(
+        '''
+        WITH shift_agg AS (
+          SELECT
+            CASE
+              WHEN EXTRACT(HOUR FROM COALESCE(tr.created_at, NOW())) >= 6
+                AND EXTRACT(HOUR FROM COALESCE(tr.created_at, NOW())) < 14 THEN 'Morning'
+              WHEN EXTRACT(HOUR FROM COALESCE(tr.created_at, NOW())) >= 14
+                AND EXTRACT(HOUR FROM COALESCE(tr.created_at, NOW())) < 22 THEN 'Afternoon'
+              ELSE 'Night'
+            END AS shift,
+            COUNT(*)::int AS total,
+            SUM(CASE WHEN tr.submitted_at IS NOT NULL THEN 1 ELSE 0 END)::int AS submitted
+          $filterSql
+          GROUP BY 1
+        )
+        SELECT shift, total, submitted
+        FROM shift_agg
+        ORDER BY CASE shift
+          WHEN 'Morning' THEN 1
+          WHEN 'Afternoon' THEN 2
+          ELSE 3
+        END
+        ''',
+        parameters: parameters,
+      );
+
+      return LabAnalyticsSnapshot(
+        totalResults: (summary['total_results'] as int?) ?? 0,
+        submittedResults: (summary['submitted_results'] as int?) ?? 0,
+        pendingResults: (summary['pending_results'] as int?) ?? 0,
+        urgentResults: (summary['urgent_results'] as int?) ?? 0,
+        avgTatHours: _toDouble(summary['avg_tat_hours']),
+        estimatedRevenue: _toDouble(summary['estimated_revenue']),
+        submittedRevenue: _toDouble(summary['submitted_revenue']),
+        fromDate: fromDate,
+        toDateExclusive: toDateExclusive,
+        patientType: normalizedType,
+        dailyTrend: trendRows.map((r) {
+          final m = r.toColumnMap();
+          return LabAnalyticsDailyPoint(
+            day: (m['day'] as DateTime?) ?? DateTime.now(),
+            total: (m['total'] as int?) ?? 0,
+            submitted: (m['submitted'] as int?) ?? 0,
+          );
+        }).toList(),
+        topTests: topRows.map((r) {
+          final m = r.toColumnMap();
+          return LabAnalyticsTestCount(
+            testName: _safeString(m['test_name']),
+            count: (m['count'] as int?) ?? 0,
+          );
+        }).toList(),
+        categoryDistribution: categoryRows.map((r) {
+          final m = r.toColumnMap();
+          return LabAnalyticsCategoryCount(
+            category: _safeString(m['category']),
+            count: (m['count'] as int?) ?? 0,
+          );
+        }).toList(),
+        shiftProductivity: shiftRows.map((r) {
+          final m = r.toColumnMap();
+          final total = (m['total'] as int?) ?? 0;
+          final submitted = (m['submitted'] as int?) ?? 0;
+          final productivityPercent =
+              total == 0 ? 0.0 : (submitted * 100.0) / total;
+
+          return LabAnalyticsShiftStat(
+            shift: _safeString(m['shift']),
+            total: total,
+            submitted: submitted,
+            productivityPercent: productivityPercent,
+          );
+        }).toList(),
+      );
+    } catch (e, st) {
+      session.log('Failed to build lab analytics snapshot: $e',
+          level: LogLevel.error, stackTrace: st);
+      rethrow;
+    }
+  }
+
   Future<void> _ensurePaymentColumns(Session session) async {
     await session.db.unsafeExecute('''
       ALTER TABLE test_results
@@ -630,6 +861,12 @@ class LabEndpoint extends Endpoint {
   }) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
+      final normalizedProfilePictureUrl = (profilePictureUrl != null &&
+              profilePictureUrl.trim().isNotEmpty &&
+              (profilePictureUrl.trim().startsWith('http://') ||
+                  profilePictureUrl.trim().startsWith('https://')))
+          ? profilePictureUrl.trim()
+          : null;
       return await session.db.transaction((transaction) async {
         // 1. Update Core User Info
         await session.db.unsafeExecute(
@@ -646,7 +883,7 @@ class LabEndpoint extends Endpoint {
             'name': name,
             'phone': phone,
             'email': email,
-            'url': profilePictureUrl,
+            'url': normalizedProfilePictureUrl,
           }),
         );
 

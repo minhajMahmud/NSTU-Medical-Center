@@ -26,11 +26,13 @@ class RoleDashboardController extends ChangeNotifier {
 
   // Doctor
   DoctorHomeData? doctorHome;
+  DoctorProfile? doctorProfile;
   List<PatientPrescriptionListItem> doctorPrescriptionList = [];
 
   // Admin
   AdminDashboardOverview? adminOverview;
   DashboardAnalytics? adminAnalytics;
+  AdminProfileRespond? adminProfile;
   List<AuditEntry> adminAudits = [];
   List<UserListItem> adminUsers = [];
   List<InventoryItemInfo> adminInventory = [];
@@ -40,6 +42,9 @@ class RoleDashboardController extends ChangeNotifier {
   List<LabTenHistory> labHistory = [];
   List<TestResult> labResults = [];
   List<LabTests> labAvailableTests = [];
+  StaffProfileDto? labProfile;
+  LabAnalyticsSnapshot? labAnalyticsSnapshot;
+  bool isLabAnalyticsLoading = false;
 
   // Dispenser
   DispenserProfileR? dispenserProfile;
@@ -151,29 +156,216 @@ class RoleDashboardController extends ChangeNotifier {
 
   Future<void> loadDoctor() => _load(() async {
     doctorHome = await _service.getDoctorHome();
+    doctorProfile = await _service.getDoctorProfile();
     doctorPrescriptionList = await _service.getDoctorPrescriptions();
   });
+
+  Future<bool> updateDoctorProfile({
+    required String name,
+    required String email,
+    required String phone,
+    required String qualification,
+    required String designation,
+    String? profilePictureUrl,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.updateDoctorProfile(
+        name: name,
+        email: email,
+        phone: phone,
+        qualification: qualification,
+        designation: designation,
+        profilePictureUrl: profilePictureUrl,
+      );
+      if (!ok) {
+        error = 'Failed to update profile';
+        return false;
+      }
+      doctorProfile = await _service.getDoctorProfile();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> loadAdmin() => _load(() async {
     adminOverview = await _service.getAdminOverview();
     adminAnalytics = await _service.getAdminAnalytics();
+    adminProfile = await _service.getAdminProfile();
     adminAudits = await _service.getRecentAudit();
     adminUsers = await _service.getAdminUsers();
     adminInventory = await _service.getAdminInventory();
   });
+
+  Future<bool> updateAdminProfile({
+    required String name,
+    required String phone,
+    String? designation,
+    String? qualification,
+    String? profilePictureUrl,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final res = await _service.updateAdminProfile(
+        name: name,
+        phone: phone,
+        designation: designation,
+        qualification: qualification,
+        profilePictureUrl: profilePictureUrl,
+      );
+      final ok = res.trim().toUpperCase() == 'OK';
+      if (!ok) {
+        error = res;
+        return false;
+      }
+      adminProfile = await _service.getAdminProfile();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> loadLab() => _load(() async {
     labSummary = await _service.getLabSummary();
     labHistory = await _service.getLabHistory();
     labResults = await _service.getAllLabResults();
     labAvailableTests = await _service.getAllLabTests();
+    labProfile = await _service.getLabStaffProfile();
   });
+
+  Future<bool> updateLabStaffProfile({
+    required String name,
+    required String email,
+    required String phone,
+    required String qualification,
+    required String designation,
+    String? profilePictureUrl,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.updateLabStaffProfile(
+        name: name,
+        email: email,
+        phone: phone,
+        qualification: qualification,
+        designation: designation,
+        profilePictureUrl: profilePictureUrl,
+      );
+      if (!ok) {
+        error = 'Failed to update profile';
+        return false;
+      }
+      labProfile = await _service.getLabStaffProfile();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> changeMyPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final res = await _service.changeMyPassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      final normalized = res.toLowerCase();
+      if (normalized.contains('success')) {
+        return true;
+      }
+      error = res;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> loadLabAnalyticsSnapshot({
+    DateTime? fromDate,
+    DateTime? toDateExclusive,
+    String patientType = 'ALL',
+  }) async {
+    isLabAnalyticsLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      labAnalyticsSnapshot = await _service.getLabAnalyticsSnapshot(
+        fromDate: fromDate,
+        toDateExclusive: toDateExclusive,
+        patientType: patientType,
+      );
+    } catch (e) {
+      error = e.toString();
+    } finally {
+      isLabAnalyticsLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> loadDispenser() => _load(() async {
     dispenserProfile = await _service.getDispenserProfile();
     dispenserStock = await _service.getDispenserStock();
     dispenserHistory = await _service.getDispenserHistory();
   });
+
+  Future<bool> updateDispenserProfile({
+    required String name,
+    required String phone,
+    required String qualification,
+    required String designation,
+    String? profilePictureUrl,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final res = await _service.updateDispenserProfile(
+        name: name,
+        phone: phone,
+        qualification: qualification,
+        designation: designation,
+        profilePictureUrl: profilePictureUrl,
+      );
+      final normalized = res.trim().toLowerCase();
+      final ok = normalized == 'ok' || normalized.contains('success');
+      if (!ok) {
+        error = res;
+        return false;
+      }
+      dispenserProfile = await _service.getDispenserProfile();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> _load(Future<void> Function() action) async {
     isLoading = true;

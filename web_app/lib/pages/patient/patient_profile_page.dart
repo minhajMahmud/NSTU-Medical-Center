@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:backend_client/backend_client.dart';
@@ -6,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../controllers/role_dashboard_controller.dart';
 import '../../widgets/common/dashboard_shell.dart';
+import '../../utils/cloudinary_upload.dart';
 
 class PatientProfilePage extends StatefulWidget {
   const PatientProfilePage({super.key});
@@ -21,6 +23,8 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   DateTime? _editDob;
   String _editBloodGroup = '';
   String _editGender = '';
+  String? _profilePictureUrl;
+  bool _isUploadingPicture = false;
 
   @override
   void initState() {
@@ -50,6 +54,47 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
         ? normalizedGender
         : '';
     _editDob = profile.dateOfBirth;
+    _profilePictureUrl = profile.profilePictureUrl;
+  }
+
+  Future<void> _uploadProfilePicture() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png'],
+      withData: true,
+    );
+    if (picked == null || picked.files.isEmpty) return;
+
+    final file = picked.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not read selected image file.')),
+      );
+      return;
+    }
+
+    setState(() => _isUploadingPicture = true);
+    final url = await CloudinaryUpload.uploadAuto(
+      bytes: bytes,
+      folder: 'profile_pictures',
+      fileName: file.name,
+    );
+    if (!mounted) return;
+    setState(() => _isUploadingPicture = false);
+
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image upload failed. Please try again.')),
+      );
+      return;
+    }
+
+    setState(() => _profilePictureUrl = url);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Profile image uploaded.')));
   }
 
   Future<void> _pickDob() async {
@@ -72,7 +117,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
       bloodGroup: _editBloodGroup.isEmpty ? null : _editBloodGroup,
       dateOfBirth: _editDob,
       gender: _editGender.isEmpty ? null : _editGender,
-      profileImageUrl: null,
+      profileImageUrl: _profilePictureUrl,
     );
 
     if (!mounted) return;
@@ -117,8 +162,11 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                 if (profile != null) ...[
                   _ProfileHeaderCard(
                     profile: profile,
+                    profilePictureUrl: _profilePictureUrl,
+                    isUploadingPicture: _isUploadingPicture,
                     isEditing: _isEditing,
                     onEditPressed: _startEditing,
+                    onUploadPicture: _isEditing ? _uploadProfilePicture : null,
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -506,13 +554,19 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
 class _ProfileHeaderCard extends StatelessWidget {
   const _ProfileHeaderCard({
     required this.profile,
+    required this.profilePictureUrl,
+    required this.isUploadingPicture,
     required this.isEditing,
     required this.onEditPressed,
+    this.onUploadPicture,
   });
 
   final dynamic profile;
+  final String? profilePictureUrl;
+  final bool isUploadingPicture;
   final bool isEditing;
   final VoidCallback onEditPressed;
+  final VoidCallback? onUploadPicture;
 
   @override
   Widget build(BuildContext context) {
@@ -528,38 +582,59 @@ class _ProfileHeaderCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 38,
                   backgroundColor: const Color(0xFFEAF2FD),
-                  child: Text(
-                    profile.name.isNotEmpty
-                        ? profile.name
-                              .trim()
-                              .split(' ')
-                              .take(2)
-                              .map((e) => e[0])
-                              .join()
-                              .toUpperCase()
-                        : 'P',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 24,
+                  backgroundImage:
+                      (profilePictureUrl != null &&
+                          profilePictureUrl!.isNotEmpty)
+                      ? NetworkImage(profilePictureUrl!)
+                      : null,
+                  child:
+                      (profilePictureUrl == null || profilePictureUrl!.isEmpty)
+                      ? Text(
+                          profile.name.isNotEmpty
+                              ? profile.name
+                                    .trim()
+                                    .split(' ')
+                                    .take(2)
+                                    .map((e) => e[0])
+                                    .join()
+                                    .toUpperCase()
+                              : 'P',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 24,
+                          ),
+                        )
+                      : null,
+                ),
+                if (onUploadPicture != null)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: InkWell(
+                      onTap: isUploadingPicture ? null : onUploadPicture,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1976D2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.all(5),
+                        child: isUploadingPicture
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                      ),
                     ),
                   ),
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1976D2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    padding: const EdgeInsets.all(5),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      color: Colors.white,
-                      size: 14,
-                    ),
-                  ),
-                ),
               ],
             ),
             const SizedBox(width: 16),

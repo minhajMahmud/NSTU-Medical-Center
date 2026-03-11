@@ -231,6 +231,11 @@ class PatientEndpoint extends Endpoint {
   ) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
+      final rawUrl = profileImageUrl?.trim();
+      final normalizedImageUrl = (rawUrl != null &&
+              (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')))
+          ? rawUrl
+          : null;
 
       return await session.db.transaction((transaction) async {
         await session.db.unsafeExecute(
@@ -245,7 +250,7 @@ class PatientEndpoint extends Endpoint {
             'id': resolvedUserId,
             'name': name,
             'phone': phone,
-            'url': profileImageUrl,
+            'url': normalizedImageUrl,
           }),
         );
 

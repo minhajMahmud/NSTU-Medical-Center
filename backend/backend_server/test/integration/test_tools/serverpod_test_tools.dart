@@ -50,21 +50,23 @@ import 'package:backend_server/src/generated/patient_external_report.dart'
 import 'package:backend_server/src/generated/patient_record_list.dart' as _i29;
 import 'package:backend_server/src/generated/patient_record_prescription_details.dart'
     as _i30;
-import 'package:backend_server/src/generated/patient_return_tests.dart' as _i31;
-import 'package:backend_server/src/generated/lab_payment_item.dart' as _i32;
+import 'package:backend_server/src/generated/lab_analytics_snapshot.dart'
+    as _i31;
+import 'package:backend_server/src/generated/patient_return_tests.dart' as _i32;
+import 'package:backend_server/src/generated/lab_payment_item.dart' as _i33;
 import 'package:backend_server/src/generated/test_result_create_upload.dart'
-    as _i33;
-import 'package:backend_server/src/generated/staff_profile.dart' as _i34;
-import 'package:backend_server/src/generated/lab_today.dart' as _i35;
-import 'package:backend_server/src/generated/lab_ten_history.dart' as _i36;
-import 'package:backend_server/src/generated/notification.dart' as _i37;
-import 'package:backend_server/src/generated/patient_reponse.dart' as _i38;
-import 'package:backend_server/src/generated/patient_report.dart' as _i39;
-import 'package:backend_server/src/generated/prescription_list.dart' as _i40;
-import 'package:backend_server/src/generated/StaffInfo.dart' as _i41;
-import 'package:backend_server/src/generated/ambulance_contact.dart' as _i42;
-import 'package:backend_server/src/generated/onduty_staff.dart' as _i43;
-import 'package:backend_server/src/generated/greeting.dart' as _i44;
+    as _i34;
+import 'package:backend_server/src/generated/staff_profile.dart' as _i35;
+import 'package:backend_server/src/generated/lab_today.dart' as _i36;
+import 'package:backend_server/src/generated/lab_ten_history.dart' as _i37;
+import 'package:backend_server/src/generated/notification.dart' as _i38;
+import 'package:backend_server/src/generated/patient_reponse.dart' as _i39;
+import 'package:backend_server/src/generated/patient_report.dart' as _i40;
+import 'package:backend_server/src/generated/prescription_list.dart' as _i41;
+import 'package:backend_server/src/generated/StaffInfo.dart' as _i42;
+import 'package:backend_server/src/generated/ambulance_contact.dart' as _i43;
+import 'package:backend_server/src/generated/onduty_staff.dart' as _i44;
+import 'package:backend_server/src/generated/greeting.dart' as _i45;
 import 'package:backend_server/src/generated/protocol.dart';
 import 'package:backend_server/src/generated/endpoints.dart';
 export 'package:serverpod_test/serverpod_test_public_exports.dart';
@@ -2786,7 +2788,44 @@ class _LabEndpoint {
 
   final _i2.SerializationManager _serializationManager;
 
-  _i3.Future<List<_i31.LabTests>> getAllLabTests(
+  _i3.Future<_i31.LabAnalyticsSnapshot> getAnalyticsSnapshot(
+    _i1.TestSessionBuilder sessionBuilder, {
+    DateTime? fromDate,
+    DateTime? toDateExclusive,
+    required String patientType,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'lab',
+            method: 'getAnalyticsSnapshot',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'lab',
+          methodName: 'getAnalyticsSnapshot',
+          parameters: _i1.testObjectToJson({
+            'fromDate': fromDate,
+            'toDateExclusive': toDateExclusive,
+            'patientType': patientType,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<_i31.LabAnalyticsSnapshot>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<List<_i32.LabTests>> getAllLabTests(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -2808,7 +2847,7 @@ class _LabEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i31.LabTests>>);
+                as _i3.Future<List<_i32.LabTests>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -2857,7 +2896,7 @@ class _LabEndpoint {
 
   _i3.Future<bool> createLabTest(
     _i1.TestSessionBuilder sessionBuilder,
-    _i31.LabTests test,
+    _i32.LabTests test,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -2888,7 +2927,7 @@ class _LabEndpoint {
 
   _i3.Future<bool> updateLabTest(
     _i1.TestSessionBuilder sessionBuilder,
-    _i31.LabTests test,
+    _i32.LabTests test,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -2983,7 +3022,7 @@ class _LabEndpoint {
     });
   }
 
-  _i3.Future<List<_i32.LabPaymentItem>> getLabPaymentItems(
+  _i3.Future<List<_i33.LabPaymentItem>> getLabPaymentItems(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3005,7 +3044,7 @@ class _LabEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i32.LabPaymentItem>>);
+                as _i3.Future<List<_i33.LabPaymentItem>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3013,7 +3052,7 @@ class _LabEndpoint {
     });
   }
 
-  _i3.Future<_i32.LabPaymentItem?> collectCashPayment(
+  _i3.Future<_i33.LabPaymentItem?> collectCashPayment(
     _i1.TestSessionBuilder sessionBuilder, {
     required int resultId,
   }) async {
@@ -3036,7 +3075,7 @@ class _LabEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i32.LabPaymentItem?>);
+                as _i3.Future<_i33.LabPaymentItem?>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3044,7 +3083,7 @@ class _LabEndpoint {
     });
   }
 
-  _i3.Future<_i32.LabPaymentItem?> markPatientNotified(
+  _i3.Future<_i33.LabPaymentItem?> markPatientNotified(
     _i1.TestSessionBuilder sessionBuilder, {
     required int resultId,
   }) async {
@@ -3067,7 +3106,7 @@ class _LabEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i32.LabPaymentItem?>);
+                as _i3.Future<_i33.LabPaymentItem?>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3110,7 +3149,7 @@ class _LabEndpoint {
     });
   }
 
-  _i3.Future<List<_i33.TestResult>> getAllTestResults(
+  _i3.Future<List<_i34.TestResult>> getAllTestResults(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3132,7 +3171,7 @@ class _LabEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i33.TestResult>>);
+                as _i3.Future<List<_i34.TestResult>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3140,7 +3179,7 @@ class _LabEndpoint {
     });
   }
 
-  _i3.Future<_i34.StaffProfileDto?> getStaffProfile(
+  _i3.Future<_i35.StaffProfileDto?> getStaffProfile(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3162,7 +3201,7 @@ class _LabEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i34.StaffProfileDto?>);
+                as _i3.Future<_i35.StaffProfileDto?>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3213,7 +3252,7 @@ class _LabEndpoint {
     });
   }
 
-  _i3.Future<_i35.LabToday> getLabHomeTwoDaySummary(
+  _i3.Future<_i36.LabToday> getLabHomeTwoDaySummary(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3235,7 +3274,7 @@ class _LabEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i35.LabToday>);
+                as _i3.Future<_i36.LabToday>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3243,7 +3282,7 @@ class _LabEndpoint {
     });
   }
 
-  _i3.Future<List<_i36.LabTenHistory>> getLast10TestHistory(
+  _i3.Future<List<_i37.LabTenHistory>> getLast10TestHistory(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3265,7 +3304,7 @@ class _LabEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i36.LabTenHistory>>);
+                as _i3.Future<List<_i37.LabTenHistory>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3319,7 +3358,7 @@ class _NotificationEndpoint {
     });
   }
 
-  _i3.Future<List<_i37.NotificationInfo>> getMyNotifications(
+  _i3.Future<List<_i38.NotificationInfo>> getMyNotifications(
     _i1.TestSessionBuilder sessionBuilder, {
     required int limit,
   }) async {
@@ -3342,7 +3381,7 @@ class _NotificationEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i37.NotificationInfo>>);
+                as _i3.Future<List<_i38.NotificationInfo>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3380,7 +3419,7 @@ class _NotificationEndpoint {
     });
   }
 
-  _i3.Future<_i37.NotificationInfo?> getNotificationById(
+  _i3.Future<_i38.NotificationInfo?> getNotificationById(
     _i1.TestSessionBuilder sessionBuilder, {
     required int notificationId,
   }) async {
@@ -3403,7 +3442,7 @@ class _NotificationEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i37.NotificationInfo?>);
+                as _i3.Future<_i38.NotificationInfo?>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3527,7 +3566,7 @@ class _PatientEndpoint {
 
   final _i2.SerializationManager _serializationManager;
 
-  _i3.Future<_i38.PatientProfile?> getPatientProfile(
+  _i3.Future<_i39.PatientProfile?> getPatientProfile(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3549,7 +3588,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i38.PatientProfile?>);
+                as _i3.Future<_i39.PatientProfile?>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3557,7 +3596,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<List<_i31.LabTests>> listTests(
+  _i3.Future<List<_i32.LabTests>> listTests(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3579,7 +3618,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i31.LabTests>>);
+                as _i3.Future<List<_i32.LabTests>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3658,7 +3697,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<List<_i39.PatientReportDto>> getMyLabReports(
+  _i3.Future<List<_i40.PatientReportDto>> getMyLabReports(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3680,7 +3719,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i39.PatientReportDto>>);
+                as _i3.Future<List<_i40.PatientReportDto>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3688,7 +3727,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<List<_i32.LabPaymentItem>> getMyLabPaymentItems(
+  _i3.Future<List<_i33.LabPaymentItem>> getMyLabPaymentItems(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3710,7 +3749,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i32.LabPaymentItem>>);
+                as _i3.Future<List<_i33.LabPaymentItem>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3718,7 +3757,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<_i32.LabPaymentItem?> payMyLabBill(
+  _i3.Future<_i33.LabPaymentItem?> payMyLabBill(
     _i1.TestSessionBuilder sessionBuilder, {
     required int resultId,
     required String paymentMethod,
@@ -3745,7 +3784,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i32.LabPaymentItem?>);
+                as _i3.Future<_i33.LabPaymentItem?>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3753,7 +3792,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<List<_i40.PrescriptionList>> getMyPrescriptionList(
+  _i3.Future<List<_i41.PrescriptionList>> getMyPrescriptionList(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3775,7 +3814,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i40.PrescriptionList>>);
+                as _i3.Future<List<_i41.PrescriptionList>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3850,7 +3889,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<List<_i40.PrescriptionList>> getPrescriptionList(
+  _i3.Future<List<_i41.PrescriptionList>> getPrescriptionList(
     _i1.TestSessionBuilder sessionBuilder,
     int patientId,
   ) async {
@@ -3873,7 +3912,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i40.PrescriptionList>>);
+                as _i3.Future<List<_i41.PrescriptionList>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3881,7 +3920,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<List<_i40.PrescriptionList>> getPrescriptionsByPatientId(
+  _i3.Future<List<_i41.PrescriptionList>> getPrescriptionsByPatientId(
     _i1.TestSessionBuilder sessionBuilder,
     int patientId,
   ) async {
@@ -3904,7 +3943,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i40.PrescriptionList>>);
+                as _i3.Future<List<_i41.PrescriptionList>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3943,7 +3982,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<List<_i41.StaffInfo>> getMedicalStaff(
+  _i3.Future<List<_i42.StaffInfo>> getMedicalStaff(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3965,7 +4004,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i41.StaffInfo>>);
+                as _i3.Future<List<_i42.StaffInfo>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -3973,7 +4012,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<List<_i42.AmbulanceContact>> getAmbulanceContacts(
+  _i3.Future<List<_i43.AmbulanceContact>> getAmbulanceContacts(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -3995,7 +4034,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i42.AmbulanceContact>>);
+                as _i3.Future<List<_i43.AmbulanceContact>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -4003,7 +4042,7 @@ class _PatientEndpoint {
     });
   }
 
-  _i3.Future<List<_i43.OndutyStaff>> getOndutyStaff(
+  _i3.Future<List<_i44.OndutyStaff>> getOndutyStaff(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -4025,7 +4064,7 @@ class _PatientEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i43.OndutyStaff>>);
+                as _i3.Future<List<_i44.OndutyStaff>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -4044,7 +4083,7 @@ class _GreetingEndpoint {
 
   final _i2.SerializationManager _serializationManager;
 
-  _i3.Future<_i44.Greeting> hello(
+  _i3.Future<_i45.Greeting> hello(
     _i1.TestSessionBuilder sessionBuilder,
     String name,
   ) async {
@@ -4067,7 +4106,7 @@ class _GreetingEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i44.Greeting>);
+                as _i3.Future<_i45.Greeting>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
