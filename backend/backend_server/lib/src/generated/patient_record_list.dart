@@ -18,6 +18,7 @@ abstract class PatientPrescriptionListItem
     required this.prescriptionId,
     required this.name,
     this.mobileNumber,
+    this.bloodGroup,
     this.gender,
     this.age,
     this.prescriptionDate,
@@ -27,6 +28,7 @@ abstract class PatientPrescriptionListItem
     required int prescriptionId,
     required String name,
     String? mobileNumber,
+    String? bloodGroup,
     String? gender,
     int? age,
     DateTime? prescriptionDate,
@@ -39,6 +41,7 @@ abstract class PatientPrescriptionListItem
       prescriptionId: jsonSerialization['prescriptionId'] as int,
       name: jsonSerialization['name'] as String,
       mobileNumber: jsonSerialization['mobileNumber'] as String?,
+      bloodGroup: jsonSerialization['bloodGroup'] as String?,
       gender: jsonSerialization['gender'] as String?,
       age: jsonSerialization['age'] as int?,
       prescriptionDate: jsonSerialization['prescriptionDate'] == null
@@ -55,6 +58,8 @@ abstract class PatientPrescriptionListItem
 
   String? mobileNumber;
 
+  String? bloodGroup;
+
   String? gender;
 
   int? age;
@@ -68,6 +73,7 @@ abstract class PatientPrescriptionListItem
     int? prescriptionId,
     String? name,
     String? mobileNumber,
+    String? bloodGroup,
     String? gender,
     int? age,
     DateTime? prescriptionDate,
@@ -79,6 +85,7 @@ abstract class PatientPrescriptionListItem
       'prescriptionId': prescriptionId,
       'name': name,
       if (mobileNumber != null) 'mobileNumber': mobileNumber,
+      if (bloodGroup != null) 'bloodGroup': bloodGroup,
       if (gender != null) 'gender': gender,
       if (age != null) 'age': age,
       if (prescriptionDate != null)
@@ -93,6 +100,7 @@ abstract class PatientPrescriptionListItem
       'prescriptionId': prescriptionId,
       'name': name,
       if (mobileNumber != null) 'mobileNumber': mobileNumber,
+      if (bloodGroup != null) 'bloodGroup': bloodGroup,
       if (gender != null) 'gender': gender,
       if (age != null) 'age': age,
       if (prescriptionDate != null)
@@ -113,17 +121,19 @@ class _PatientPrescriptionListItemImpl extends PatientPrescriptionListItem {
     required int prescriptionId,
     required String name,
     String? mobileNumber,
+    String? bloodGroup,
     String? gender,
     int? age,
     DateTime? prescriptionDate,
   }) : super._(
-         prescriptionId: prescriptionId,
-         name: name,
-         mobileNumber: mobileNumber,
-         gender: gender,
-         age: age,
-         prescriptionDate: prescriptionDate,
-       );
+          prescriptionId: prescriptionId,
+          name: name,
+          mobileNumber: mobileNumber,
+          bloodGroup: bloodGroup,
+          gender: gender,
+          age: age,
+          prescriptionDate: prescriptionDate,
+        );
 
   /// Returns a shallow copy of this [PatientPrescriptionListItem]
   /// with some or all fields replaced by the given arguments.
@@ -133,6 +143,7 @@ class _PatientPrescriptionListItemImpl extends PatientPrescriptionListItem {
     int? prescriptionId,
     String? name,
     Object? mobileNumber = _Undefined,
+    Object? bloodGroup = _Undefined,
     Object? gender = _Undefined,
     Object? age = _Undefined,
     Object? prescriptionDate = _Undefined,
@@ -141,6 +152,7 @@ class _PatientPrescriptionListItemImpl extends PatientPrescriptionListItem {
       prescriptionId: prescriptionId ?? this.prescriptionId,
       name: name ?? this.name,
       mobileNumber: mobileNumber is String? ? mobileNumber : this.mobileNumber,
+      bloodGroup: bloodGroup is String? ? bloodGroup : this.bloodGroup,
       gender: gender is String? ? gender : this.gender,
       age: age is int? ? age : this.age,
       prescriptionDate: prescriptionDate is DateTime?

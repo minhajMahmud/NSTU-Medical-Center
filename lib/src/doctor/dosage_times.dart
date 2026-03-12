@@ -49,11 +49,23 @@ String encodeDosageTimesFromBanglaMap(Map<String, bool> times) {
   return '$m+$a+$n';
 }
 
+String encodeDosageTimesFromEnglishMap(Map<String, bool> times) {
+  bool t(String key) => (times[key] ?? false) == true;
+  final m = t('Morning') ? '1' : '0';
+  final a = t('Afternoon') ? '1' : '0';
+  final n = t('Night') ? '1' : '0';
+  return '$m+$a+$n';
+}
+
 String encodeDosageTimes({
   required Map<String, bool> times,
   required bool four,
 }) {
   if (four) return '1+1+1+1';
+  // Try English keys first (new format), fall back to Bengali (legacy)
+  if (times.containsKey('Morning')) {
+    return encodeDosageTimesFromEnglishMap(times);
+  }
   return encodeDosageTimesFromBanglaMap(times);
 }
 
@@ -79,6 +91,32 @@ String dosageTimesDisplayBangla(String raw) {
   if (looksNumeric) return '';
 
   // For any other unrecognized format (e.g., '3 times daily'), keep raw.
+  return rawTrim;
+}
+
+/// Converts stored dosage string into an English label string for UI/PDF.
+/// - "1+0+1" -> "Morning, Night"
+/// - "1+1+1+1" -> "4 times"
+/// - If nothing selected, returns empty string.
+String dosageTimesDisplayEnglish(String raw) {
+  final rawTrim = raw.trim();
+  if (isDosageFourTimes(rawTrim)) return '4 times';
+  final map = decodeDosageTimesToBanglaMap(rawTrim);
+  final selected = <String>[];
+  if (map['সকাল'] == true) selected.add('Morning');
+  if (map['দুপুর'] == true) selected.add('Afternoon');
+  if (map['রাত'] == true) selected.add('Night');
+
+  if (selected.isNotEmpty) return selected.join(', ');
+
+  final parts = rawTrim.split('+').map((s) => s.trim()).toList();
+  final looksNumeric =
+      parts.length == 3 && parts.every((p) => p == '0' || p == '1');
+
+  // For numeric patterns like 0+0+0, prefer blank (caller can show '-')
+  if (looksNumeric) return '';
+
+  // For any other unrecognized format, keep raw.
   return rawTrim;
 }
 

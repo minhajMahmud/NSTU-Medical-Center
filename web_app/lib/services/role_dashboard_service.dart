@@ -92,6 +92,13 @@ class RoleDashboardService {
     limit: limit,
     offset: 0,
   );
+  Future<Map<String, String?>> getDoctorPatientByPhoneOrName(String query) =>
+      _client.doctor.getPatientByPhone(query);
+  Future<int> createDoctorPrescription({
+    required Prescription prescription,
+    required List<PrescribedItem> items,
+    required String patientPhone,
+  }) => _client.doctor.createPrescription(prescription, items, patientPhone);
 
   // Admin
   Future<AdminDashboardOverview> getAdminOverview() =>
@@ -120,8 +127,9 @@ class RoleDashboardService {
     String? profilePictureUrl,
   }) async {
     final email = await _getCurrentEmail();
-    if (email == null || email.isEmpty)
+    if (email == null || email.isEmpty) {
       return 'Unable to resolve current user email';
+    }
     return _client.adminEndpoints.updateAdminProfile(
       email,
       name,

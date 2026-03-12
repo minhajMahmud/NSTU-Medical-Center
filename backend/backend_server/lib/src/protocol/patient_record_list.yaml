@@ -3,6 +3,7 @@ fields:
   prescriptionId: int
   name: String
   mobileNumber: String?
+  bloodGroup: String?
   gender: String?
   age: int?
   prescriptionDate: DateTime?

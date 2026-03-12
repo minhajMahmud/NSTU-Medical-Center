@@ -476,6 +476,7 @@ class DoctorEndpoint extends Endpoint {
           u.name,
           u.phone,
           p.gender,
+          p.blood_group,
           p.date_of_birth,
           EXTRACT(YEAR FROM age(CURRENT_DATE, p.date_of_birth))::int AS age
         FROM users u
@@ -520,6 +521,7 @@ class DoctorEndpoint extends Endpoint {
       final dobStr = dob?.toString();
 
       final genderStr = row['gender']?.toString();
+      final bloodGroupStr = row['blood_group']?.toString();
 
       final ageVal = row['age'];
       final ageStr = ageVal?.toString();
@@ -532,6 +534,7 @@ class DoctorEndpoint extends Endpoint {
         'name': name,
         'phone': phoneStr,
         'gender': genderStr,
+        'bloodGroup': bloodGroupStr,
         'dateOfBirth': dobStr,
         'age': ageStr,
       };
@@ -550,8 +553,6 @@ class DoctorEndpoint extends Endpoint {
   ) async {
     try {
       final resolvedDoctorId = requireAuthenticatedUserId(session);
-      // FIXED QUERY: Joining with 'users' because 'phone' isn't in 'patient_profiles'
-      // createPrescription মেথডের ভেতরে এই অংশটুকু পরিবর্তন করতে পারেন:
       final patientData = await getPatientByPhone(session, patientPhone);
 
       int? foundPatientId;
@@ -560,6 +561,60 @@ class DoctorEndpoint extends Endpoint {
       }
 
       await session.db.unsafeExecute('BEGIN');
+
+      // If no patient exists for the provided phone, create an OUTSIDE patient
+      // so both web_app and mobile_app can still store prescriptions.
+      if (foundPatientId == null) {
+        final digitsOnly = patientPhone.replaceAll(RegExp(r'[^0-9]'), '');
+        final normalizedPhone = digitsOnly.length > 11
+            ? digitsOnly.substring(digitsOnly.length - 11)
+            : digitsOnly;
+
+        final displayName = (prescription.name ?? '').trim().isEmpty
+            ? 'Outside Patient'
+            : prescription.name!.trim();
+
+        final ts = DateTime.now().millisecondsSinceEpoch;
+        final safePhonePart =
+            normalizedPhone.isEmpty ? 'unknown' : normalizedPhone;
+        final generatedEmail = 'outside_${safePhonePart}_$ts@nstu.local';
+
+        final newUserRows = await session.db.unsafeQuery(
+          '''
+          INSERT INTO users (
+            name, email, password_hash, phone, role, is_active, email_otp_verified
+          ) VALUES (
+            @name, @email, @pwd, @phone, CAST(@role AS user_role), true, true
+          ) RETURNING user_id
+          ''',
+          parameters: QueryParameters.named({
+            'name': displayName,
+            'email': generatedEmail,
+            'pwd': 'NO_LOGIN_PROFILE',
+            'phone': normalizedPhone.isEmpty ? null : normalizedPhone,
+            'role': 'outside',
+          }),
+        );
+
+        if (newUserRows.isEmpty) {
+          await session.db.unsafeExecute('ROLLBACK');
+          return -1;
+        }
+
+        foundPatientId = newUserRows.first.toColumnMap()['user_id'] as int;
+
+        await session.db.unsafeExecute(
+          '''
+          INSERT INTO patient_profiles (user_id, gender)
+          VALUES (@uid, @gender)
+          ON CONFLICT (user_id) DO UPDATE SET gender = EXCLUDED.gender
+          ''',
+          parameters: QueryParameters.named({
+            'uid': foundPatientId,
+            'gender': prescription.gender,
+          }),
+        );
+      }
 
       // Insert prescription - Matches your SQL Table
       final res = await session.db.unsafeQuery('''
@@ -626,8 +681,21 @@ class DoctorEndpoint extends Endpoint {
     try {
       final resolvedDoctorId = requireAuthenticatedUserId(session);
       final res = await session.db.unsafeQuery('''
-      SELECT * FROM "UploadpatientR" 
-      WHERE prescribed_doctor_id = @id 
+      SELECT
+        r.*,
+        COALESCE(
+          r.prescription_id,
+          (
+            SELECT p2.prescription_id
+            FROM prescriptions p2
+            WHERE p2.patient_id = r.patient_id
+              AND p2.doctor_id = @id
+            ORDER BY p2.prescription_id DESC
+            LIMIT 1
+          )
+        ) AS effective_prescription_id
+      FROM "UploadpatientR" r
+      WHERE r.prescribed_doctor_id = @id
       ORDER BY created_at DESC
     ''', parameters: QueryParameters.named({'id': resolvedDoctorId}));
 
@@ -640,7 +708,7 @@ class DoctorEndpoint extends Endpoint {
           reportDate: map['report_date'] as DateTime,
           filePath: map['file_path'] as String,
           prescribedDoctorId: map['prescribed_doctor_id'] as int,
-          prescriptionId: map['prescription_id'] as int?,
+          prescriptionId: map['effective_prescription_id'] as int?,
           uploadedBy: map['uploaded_by'] as int,
           reviewed: (map['reviewed'] as bool?) ?? false,
           createdAt: map['created_at'] as DateTime?,
@@ -749,6 +817,22 @@ class DoctorEndpoint extends Endpoint {
       VALUES (@pId, 'Prescription Updated', 'Your doctor has updated your prescription after reviewing your report.', false)
     ''', parameters: QueryParameters.named({'pId': pData['patient_id']}));
 
+      // Keep reports linked to the latest revised prescription so reopening
+      // the same test shows latest prescription details.
+      await session.db.unsafeExecute(
+        '''
+        UPDATE "UploadpatientR"
+        SET prescription_id = @newId
+        WHERE prescription_id = @oldId
+          AND prescribed_doctor_id = @did
+        ''',
+        parameters: QueryParameters.named({
+          'newId': newId,
+          'oldId': originalPrescriptionId,
+          'did': resolvedDoctorId,
+        }),
+      );
+
       await session.db.unsafeExecute('COMMIT');
       return newId;
     } catch (e) {
@@ -769,19 +853,21 @@ class DoctorEndpoint extends Endpoint {
 
     final rows = await session.db.unsafeQuery(r'''
       SELECT
-        prescription_id,
-        name,
-        mobile_number,
-        gender,
-        age,
-        prescription_date
-      FROM prescriptions
+        pr.prescription_id,
+        pr.name,
+        pr.mobile_number,
+        pp.blood_group,
+        pr.gender,
+        pr.age,
+        pr.prescription_date
+      FROM prescriptions pr
+      LEFT JOIN patient_profiles pp ON pp.user_id = pr.patient_id
       WHERE
-        doctor_id = @did AND
+        pr.doctor_id = @did AND
         (@q = '' OR
-         LOWER(name) LIKE LOWER(@likeQ) OR
-         RIGHT(REPLACE(REPLACE(mobile_number, ' ', ''), '-', ''), 11) LIKE @phoneLikePrefix)
-      ORDER BY prescription_id DESC
+         LOWER(pr.name) LIKE LOWER(@likeQ) OR
+         RIGHT(REPLACE(REPLACE(pr.mobile_number, ' ', ''), '-', ''), 11) LIKE @phoneLikePrefix)
+      ORDER BY pr.prescription_id DESC
       LIMIT @limit OFFSET @offset
     ''',
         parameters: QueryParameters.named({
@@ -799,6 +885,7 @@ class DoctorEndpoint extends Endpoint {
         prescriptionId: m['prescription_id'] as int,
         name: _s(m['name']),
         mobileNumber: m['mobile_number']?.toString(),
+        bloodGroup: m['blood_group']?.toString(),
         gender: m['gender']?.toString(),
         age: m['age'] as int?,
         prescriptionDate: m['prescription_date'] as DateTime?,

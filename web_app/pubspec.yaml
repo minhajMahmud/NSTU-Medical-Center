@@ -19,6 +19,7 @@ dependencies:
   file_picker: ^10.3.3
   http: ^1.6.0
   http_parser: ^4.0.0
+  pdf: ^3.10.4
   universal_html: ^2.2.4
 
 dev_dependencies:
@@ -28,3 +29,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/nstu_logo.jpg
+    - assets/images/prescription_download_heading.png
+
+  fonts:
+    - family: Kalpurush
+      fonts:
+        - asset: assets/fonts/Kalpurush.ttf

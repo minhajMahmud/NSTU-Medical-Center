@@ -12,6 +12,7 @@ import '../../pages/dispenser/dispenser_dashboard_page.dart';
 import '../../pages/dispenser/dispenser_history_page.dart';
 import '../../pages/dispenser/dispenser_stock_page.dart';
 import '../../pages/doctor/doctor_dashboard_page.dart';
+import '../../pages/doctor/doctor_prescription_creator_page.dart';
 import '../../pages/doctor/doctor_profile_page.dart';
 import '../../pages/doctor/doctor_prescriptions_page.dart';
 import '../../pages/doctor/doctor_records_page.dart';
@@ -157,6 +158,17 @@ GoRouter createAppRouter(AuthController auth) {
       GoRoute(
         path: '/doctor/prescriptions',
         builder: (_, __) => const DoctorPrescriptionsPage(),
+      ),
+      GoRoute(
+        path: '/doctor/prescriptions/create',
+        builder: (_, state) => DoctorPrescriptionCreatorPage(
+          patientId: state.uri.queryParameters['patientId'],
+          patientName: state.uri.queryParameters['name'],
+          phone: state.uri.queryParameters['phone'],
+          age: state.uri.queryParameters['age'],
+          gender: state.uri.queryParameters['gender'],
+          isNewRecord: state.uri.queryParameters['new'] == '1',
+        ),
       ),
       GoRoute(
         path: '/doctor/records',

@@ -195,6 +195,53 @@ class RoleDashboardController extends ChangeNotifier {
     }
   }
 
+  Future<List<PatientPrescriptionListItem>> searchDoctorPatients({
+    required String query,
+    int limit = 30,
+  }) async {
+    try {
+      final rows = await _service.getDoctorPrescriptions(
+        query: query,
+        limit: limit,
+      );
+      doctorPrescriptionList = rows;
+      notifyListeners();
+      return rows;
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      return const [];
+    }
+  }
+
+  Future<Map<String, String?>> lookupDoctorPatient(String query) async {
+    try {
+      return await _service.getDoctorPatientByPhoneOrName(query);
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      return {'id': null, 'name': null};
+    }
+  }
+
+  Future<int> saveDoctorPrescription({
+    required Prescription prescription,
+    required List<PrescribedItem> items,
+    required String patientPhone,
+  }) async {
+    try {
+      return await _service.createDoctorPrescription(
+        prescription: prescription,
+        items: items,
+        patientPhone: patientPhone,
+      );
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      return -1;
+    }
+  }
+
   Future<void> loadAdmin() => _load(() async {
     adminOverview = await _service.getAdminOverview();
     adminAnalytics = await _service.getAdminAnalytics();
