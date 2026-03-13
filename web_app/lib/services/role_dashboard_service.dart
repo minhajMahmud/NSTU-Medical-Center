@@ -35,7 +35,9 @@ class RoleDashboardService {
       _client.patient.getPatientProfile();
   Future<List<StaffInfo>> getPatientDoctors() =>
       _client.patient.getMedicalStaff();
-  Future<List<PrescriptionList>> getPatientAppointments() =>
+  Future<List<AppointmentRequestItem>> getPatientAppointments() =>
+      _client.patient.getMyAppointmentRequests();
+  Future<List<PrescriptionList>> getPatientAppointmentsLegacy() =>
       _client.patient.getMyPrescriptionList();
   Future<List<PatientReportDto>> getPatientReports() =>
       _client.patient.getMyLabReports();
@@ -92,6 +94,33 @@ class RoleDashboardService {
     limit: limit,
     offset: 0,
   );
+  Future<List<AppointmentRequestItem>> getDoctorAppointmentRequests({
+    String? status,
+    String? query,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    try {
+      return await _client.doctor.getAppointmentRequests(
+        status: status,
+        query: query,
+        limit: limit,
+        offset: offset,
+      );
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<bool> updateDoctorAppointmentRequestStatus({
+    required int appointmentRequestId,
+    required String status,
+    String? declineReason,
+  }) => _client.doctor.updateAppointmentRequestStatus(
+    appointmentRequestId: appointmentRequestId,
+    status: status,
+    declineReason: declineReason,
+  );
   Future<Map<String, String?>> getDoctorPatientByPhoneOrName(String query) =>
       _client.doctor.getPatientByPhone(query);
   Future<int> createDoctorPrescription({
@@ -99,6 +128,9 @@ class RoleDashboardService {
     required List<PrescribedItem> items,
     required String patientPhone,
   }) => _client.doctor.createPrescription(prescription, items, patientPhone);
+  Future<PatientPrescriptionDetails?> getDoctorPrescriptionDetails(
+    int prescriptionId,
+  ) => _client.doctor.getPrescriptionDetails(prescriptionId: prescriptionId);
 
   // Admin
   Future<AdminDashboardOverview> getAdminOverview() =>

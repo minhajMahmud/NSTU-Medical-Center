@@ -85,7 +85,12 @@ class _DispenserDashboardPageState extends State<DispenserDashboardPage> {
 
     if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image upload failed. Please try again.')),
+        SnackBar(
+          content: Text(
+            CloudinaryUpload.lastErrorMessage ??
+                'Image upload failed. Please try again.',
+          ),
+        ),
       );
       return;
     }

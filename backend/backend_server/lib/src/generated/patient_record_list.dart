@@ -126,14 +126,14 @@ class _PatientPrescriptionListItemImpl extends PatientPrescriptionListItem {
     int? age,
     DateTime? prescriptionDate,
   }) : super._(
-          prescriptionId: prescriptionId,
-          name: name,
-          mobileNumber: mobileNumber,
-          bloodGroup: bloodGroup,
-          gender: gender,
-          age: age,
-          prescriptionDate: prescriptionDate,
-        );
+         prescriptionId: prescriptionId,
+         name: name,
+         mobileNumber: mobileNumber,
+         bloodGroup: bloodGroup,
+         gender: gender,
+         age: age,
+         prescriptionDate: prescriptionDate,
+       );
 
   /// Returns a shallow copy of this [PatientPrescriptionListItem]
   /// with some or all fields replaced by the given arguments.

@@ -6,6 +6,18 @@ import 'package:provider/provider.dart';
 import '../../controllers/role_dashboard_controller.dart';
 import '../../widgets/common/dashboard_shell.dart';
 
+class _DoctorUiColors {
+  static const Color ink = Color(0xFF0F172A);
+  static const Color muted = Color(0xFF64748B);
+  static const Color panel = Color(0xFFFFFFFF);
+  static const Color panelAlt = Color(0xFFF8FBFF);
+  static const Color border = Color(0xFFDCE7F5);
+  static const Color primary = Color(0xFF1D4ED8);
+  static const Color primarySoft = Color(0xFFE7F0FF);
+  static const Color emerald = Color(0xFF059669);
+  static const Color danger = Color(0xFFDC2626);
+}
+
 class DoctorDashboardPage extends StatefulWidget {
   const DoctorDashboardPage({super.key});
 
@@ -210,50 +222,69 @@ class _DoctorWelcomeHeader extends StatelessWidget {
     final name = (home?.doctorName as String?)?.trim();
     final designation = (home?.doctorDesignation as String?)?.trim();
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Welcome back, ${name?.isNotEmpty == true ? 'Dr. $name' : 'Doctor'}',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                designation?.isNotEmpty == true
-                    ? 'Here is what\'s happening at NSTU Medical Center today • $designation'
-                    : 'Here is what\'s happening at NSTU Medical Center today.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: const Color(0xFF64748B)),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFFFFF), Color(0xFFF3F8FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _DoctorUiColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F1E3A8A),
+            blurRadius: 20,
+            offset: Offset(0, 8),
           ),
-        ),
-        CircleAvatar(
-          radius: 28,
-          backgroundColor: const Color(0xFFE8F1FF),
-          backgroundImage:
-              profilePictureUrl != null && profilePictureUrl!.isNotEmpty
-              ? NetworkImage(profilePictureUrl!)
-              : (home?.doctorProfilePictureUrl != null &&
-                    (home.doctorProfilePictureUrl as String).isNotEmpty)
-              ? NetworkImage(home.doctorProfilePictureUrl as String)
-              : null,
-          child:
-              ((profilePictureUrl == null || profilePictureUrl!.isEmpty) &&
-                  (home?.doctorProfilePictureUrl == null ||
-                      (home.doctorProfilePictureUrl as String).isEmpty))
-              ? const Icon(Icons.person, size: 28)
-              : null,
-        ),
-      ],
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome back, ${name?.isNotEmpty == true ? 'Dr. $name' : 'Doctor'}',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: _DoctorUiColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  designation?.isNotEmpty == true
+                      ? 'Here is what\'s happening at NSTU Medical Center today • $designation'
+                      : 'Here is what\'s happening at NSTU Medical Center today.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: _DoctorUiColors.muted),
+                ),
+              ],
+            ),
+          ),
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: _DoctorUiColors.primarySoft,
+            backgroundImage:
+                profilePictureUrl != null && profilePictureUrl!.isNotEmpty
+                ? NetworkImage(profilePictureUrl!)
+                : (home?.doctorProfilePictureUrl != null &&
+                      (home.doctorProfilePictureUrl as String).isNotEmpty)
+                ? NetworkImage(home.doctorProfilePictureUrl as String)
+                : null,
+            child:
+                ((profilePictureUrl == null || profilePictureUrl!.isEmpty) &&
+                    (home?.doctorProfilePictureUrl == null ||
+                        (home.doctorProfilePictureUrl as String).isEmpty))
+                ? const Icon(Icons.person, size: 30, color: Color(0xFF1D4ED8))
+                : null,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -277,8 +308,19 @@ class _OverviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 280,
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: _DoctorUiColors.panel,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _DoctorUiColors.border),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x101E3A8A),
+              blurRadius: 18,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Column(
@@ -290,17 +332,17 @@ class _OverviewCard extends StatelessWidget {
                     child: Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF64748B),
+                        color: _DoctorUiColors.muted,
                       ),
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F1FF),
+                      color: _DoctorUiColors.primarySoft,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(icon, color: const Color(0xFF2563EB), size: 18),
+                    child: Icon(icon, color: _DoctorUiColors.primary, size: 18),
                   ),
                 ],
               ),
@@ -309,7 +351,7 @@ class _OverviewCard extends StatelessWidget {
                 value,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
+                  color: _DoctorUiColors.ink,
                 ),
               ),
               const SizedBox(height: 12),
@@ -319,8 +361,8 @@ class _OverviewCard extends StatelessWidget {
                     deltaPositive ? Icons.trending_up : Icons.trending_down,
                     size: 16,
                     color: deltaPositive
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFFEF4444),
+                        ? _DoctorUiColors.emerald
+                        : _DoctorUiColors.danger,
                   ),
                   const SizedBox(width: 4),
                   Expanded(
@@ -328,8 +370,8 @@ class _OverviewCard extends StatelessWidget {
                       deltaText,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: deltaPositive
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFFEF4444),
+                            ? _DoctorUiColors.emerald
+                            : _DoctorUiColors.danger,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -359,8 +401,12 @@ class _ReportsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasReports = reports.isNotEmpty;
 
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    return Container(
+      decoration: BoxDecoration(
+        color: _DoctorUiColors.panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _DoctorUiColors.border),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -381,7 +427,7 @@ class _ReportsPanel extends StatelessWidget {
                     Text(
                       'Summary for the last 24 hours',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF64748B),
+                        color: _DoctorUiColors.muted,
                       ),
                     ),
                   ],
@@ -399,9 +445,9 @@ class _ReportsPanel extends StatelessWidget {
                   horizontal: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: _DoctorUiColors.panelAlt,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: _DoctorUiColors.border),
                 ),
                 child: Column(
                   children: [
@@ -452,10 +498,10 @@ class _ReportsPanel extends StatelessWidget {
                     (report) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const CircleAvatar(
-                        backgroundColor: Color(0xFFE8F1FF),
+                        backgroundColor: Color(0xFFE7F0FF),
                         child: Icon(
                           Icons.science_rounded,
-                          color: Color(0xFF2563EB),
+                          color: Color(0xFF1D4ED8),
                         ),
                       ),
                       title: Text(
@@ -483,8 +529,12 @@ class _RecentActivityPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    return Container(
+      decoration: BoxDecoration(
+        color: _DoctorUiColors.panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _DoctorUiColors.border),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -526,14 +576,14 @@ class _RecentActivityPanel extends StatelessWidget {
                           Text(
                             activity.subtitle,
                             style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: const Color(0xFF64748B)),
+                                ?.copyWith(color: _DoctorUiColors.muted),
                           ),
                           if (activity.timeAgo.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             Text(
                               activity.timeAgo,
                               style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(color: const Color(0xFF94A3B8)),
+                                  ?.copyWith(color: const Color(0xFF8AA0BE)),
                             ),
                           ],
                         ],
@@ -576,11 +626,18 @@ class _NextFollowUpCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+          colors: [Color(0xFF1E40AF), Color(0xFF0EA5A4)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A1E3A8A),
+            blurRadius: 22,
+            offset: Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

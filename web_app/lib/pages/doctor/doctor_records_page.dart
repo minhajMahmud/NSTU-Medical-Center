@@ -62,6 +62,7 @@ class _DoctorRecordsPageState extends State<DoctorRecordsPage> {
 
   void _openPrescriptionCreator({
     String? patientId,
+    int? prescriptionId,
     String? fullName,
     String? phone,
     String? age,
@@ -73,6 +74,7 @@ class _DoctorRecordsPageState extends State<DoctorRecordsPage> {
       path: '/doctor/prescriptions/create',
       queryParameters: {
         if (patientId != null && patientId.isNotEmpty) 'patientId': patientId,
+        if (prescriptionId != null) 'prescriptionId': prescriptionId.toString(),
         if (fullName != null && fullName.isNotEmpty) 'name': fullName,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
         if (age != null && age.isNotEmpty) 'age': age,
@@ -378,6 +380,7 @@ class _DoctorRecordsPageState extends State<DoctorRecordsPage> {
                                 onPressed: () {
                                   _openPrescriptionCreator(
                                     patientId: row.prescriptionId.toString(),
+                                    prescriptionId: row.prescriptionId,
                                     fullName: row.name,
                                     phone: row.mobileNumber,
                                     age: row.age?.toString(),

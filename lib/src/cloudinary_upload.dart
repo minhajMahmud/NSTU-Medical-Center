@@ -1,19 +1,17 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 class CloudinaryUpload {
-  /// Cloudinary cloud name (public).
-  static const String cloudName = 'dfrzizwb1';
-
-  /// Unsigned upload preset (public).
-  /// Configure this preset in Cloudinary to allow unsigned uploads.
-  static const String uploadPreset = 'sabbir';
+  static const String _cloudName = 'dorcxchuf';
+  static const String _apiKey = '889137245574349';
+  static const String _apiSecret = 'UQARnH8trtIbeFP7Oowva3ILF9M';
 
   static Uri _uploadUri() =>
-      Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/auto/upload');
+      Uri.parse('https://api.cloudinary.com/v1_1/$_cloudName/auto/upload');
 
   static bool _isPdfName(String fileName) =>
       fileName.toLowerCase().trim().endsWith('.pdf');
@@ -25,7 +23,6 @@ class CloudinaryUpload {
     if (name.endsWith('.jpg') || name.endsWith('.jpeg')) {
       return MediaType('image', 'jpeg');
     }
-    // Cloudinary can still detect, but default to jpeg for images.
     return MediaType('image', 'jpeg');
   }
 
@@ -35,6 +32,16 @@ class CloudinaryUpload {
       return 'upload_${DateTime.now().millisecondsSinceEpoch}';
     }
     return trimmed.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+  }
+
+  /// Generates a Cloudinary signed-upload signature.
+  /// params must NOT include api_key or file.
+  static String _generateSignature(Map<String, String> params) {
+    final sorted = params.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final paramString = sorted.map((e) => '${e.key}=${e.value}').join('&');
+    final toSign = '$paramString$_apiSecret';
+    return sha1.convert(utf8.encode(toSign)).toString();
   }
 
   /// Convenience: infer `isPdf` + content-type from `fileName`.
@@ -52,8 +59,7 @@ class CloudinaryUpload {
     );
   }
 
-  /// Universal uploader for image/PDF bytes.
-  /// Upload happens from the frontend (no apiSecret in app).
+  /// Universal uploader for image/PDF bytes using signed upload.
   static Future<String?> uploadBytes({
     required Uint8List bytes,
     required String folder,
@@ -63,8 +69,15 @@ class CloudinaryUpload {
     try {
       final safeName = _sanitizeFileName(fileName);
       final inferredIsPdf = isPdf || _isPdfName(safeName);
+      final timestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000)
+          .toString();
+      final signParams = {'folder': folder, 'timestamp': timestamp};
+      final signature = _generateSignature(signParams);
+
       final request = http.MultipartRequest('POST', _uploadUri())
-        ..fields['upload_preset'] = uploadPreset
+        ..fields['api_key'] = _apiKey
+        ..fields['timestamp'] = timestamp
+        ..fields['signature'] = signature
         ..fields['folder'] = folder
         ..files.add(
           http.MultipartFile.fromBytes(

@@ -2,6 +2,7 @@ import 'package:backend_client/backend_client.dart';
 
 class DoctorModel {
   DoctorModel({
+    required this.userId,
     required this.name,
     required this.phone,
     this.designation,
@@ -9,6 +10,7 @@ class DoctorModel {
     this.profilePictureUrl,
   });
 
+  final int? userId;
   final String name;
   final String phone;
   final String? designation;
@@ -16,6 +18,7 @@ class DoctorModel {
   final String? profilePictureUrl;
 
   factory DoctorModel.fromStaffInfo(StaffInfo staff) => DoctorModel(
+    userId: staff.userId,
     name: staff.name,
     phone: staff.phone,
     designation: staff.designation,

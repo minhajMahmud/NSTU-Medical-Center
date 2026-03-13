@@ -876,22 +876,27 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    const primaryBlue = Color(0xFF1E6FD9);
+    const primaryBlueDark = Color(0xFF164EA6);
+    const pageBackground = Color(0xFFF3F6FB);
+    const cardBorder = Color(0xFFD7E3F8);
+    const inputFill = Color(0xFFF7FAFF);
 
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: pageBackground,
       appBar: AppBar(
         title: const Text(
           "Doctor Profile",
-          style: TextStyle(fontWeight: FontWeight.w800),
+          style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.2),
         ),
 
         elevation: 0,
         backgroundColor: Colors.white,
-        foregroundColor: Colors.blue,
+        foregroundColor: primaryBlueDark,
         automaticallyImplyLeading: false,
         centerTitle: true,
       ),
@@ -905,17 +910,21 @@ class _ProfilePageState extends State<ProfilePage> {
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.deepPurple.shade400,
-                      Colors.deepPurple.shade200,
-                    ],
+                  gradient: const LinearGradient(
+                    colors: [primaryBlueDark, primaryBlue],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color.fromRGBO(22, 78, 166, 0.25),
+                      blurRadius: 20,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
                 ),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(18),
                 child: Row(
                   children: [
                     // Avatar and edit overlay (shows web/local/remote image)
@@ -941,7 +950,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               padding: const EdgeInsets.all(6),
                               child: const Icon(
                                 Icons.camera_alt,
-                                color: Colors.deepPurple,
+                                color: primaryBlueDark,
                                 size: 18,
                               ),
                             ),
@@ -967,14 +976,19 @@ class _ProfilePageState extends State<ProfilePage> {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              const SizedBox(height: 6),
+                              const Icon(
+                                Icons.badge_outlined,
+                                size: 16,
+                                color: Color(0xFFD8E9FF),
+                              ),
+                              const SizedBox(width: 6),
                               Text(
                                 _designationController.text,
                                 style: theme.textTheme.titleSmall?.copyWith(
-                                  color: Colors.white,
+                                  color: const Color(0xFFE8F2FF),
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              const SizedBox(height: 6),
                             ],
                           ),
                         ],
@@ -988,21 +1002,51 @@ class _ProfilePageState extends State<ProfilePage> {
 
               // Personal Information Card
               Card(
-                elevation: 2,
+                elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: cardBorder),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(18),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Personal Information',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.person_outline,
+                            color: primaryBlueDark,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Personal Information',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F8EE),
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            child: const Text(
+                              'ACTIVE ACCOUNT',
+                              style: TextStyle(
+                                color: Color(0xFF1E8E3E),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
 
@@ -1014,13 +1058,24 @@ class _ProfilePageState extends State<ProfilePage> {
                           labelText: "Full Name",
                           prefixIcon: const Icon(
                             Icons.person,
-                            color: Colors.deepPurple,
+                            color: primaryBlue,
                           ),
                           filled: true,
-                          fillColor: Colors.grey[50],
+                          fillColor: inputFill,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderSide: const BorderSide(color: cardBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: cardBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: primaryBlue,
+                              width: 1.4,
+                            ),
                           ),
                         ),
                       ),
@@ -1039,7 +1094,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           labelText: "Email",
                           prefixIcon: const Icon(
                             Icons.email,
-                            color: Colors.deepPurple,
+                            color: primaryBlue,
                           ),
                           suffixIcon:
                               (_emailChanged && !_emailVerifiedForCurrentValue)
@@ -1055,10 +1110,21 @@ class _ProfilePageState extends State<ProfilePage> {
                               ? const BoxConstraints(minHeight: 36, minWidth: 0)
                               : null,
                           filled: true,
-                          fillColor: Colors.grey[100],
+                          fillColor: inputFill,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderSide: const BorderSide(color: cardBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: cardBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: primaryBlue,
+                              width: 1.4,
+                            ),
                           ),
                           // keep or remove lock icon as desired
                         ),
@@ -1082,7 +1148,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           labelText: "Phone Number",
                           prefixIcon: const Icon(
                             Icons.phone,
-                            color: Colors.deepPurple,
+                            color: primaryBlue,
                           ),
                           suffixIcon:
                               (_phoneChanged && !_phoneVerifiedForCurrentValue)
@@ -1098,10 +1164,21 @@ class _ProfilePageState extends State<ProfilePage> {
                               ? const BoxConstraints(minHeight: 36, minWidth: 0)
                               : null,
                           filled: true,
-                          fillColor: Colors.grey[50],
+                          fillColor: inputFill,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderSide: const BorderSide(color: cardBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: cardBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: primaryBlue,
+                              width: 1.4,
+                            ),
                           ),
                         ),
                       ),
@@ -1116,13 +1193,24 @@ class _ProfilePageState extends State<ProfilePage> {
                           labelText: "Designation",
                           prefixIcon: const Icon(
                             Icons.medical_services,
-                            color: Colors.deepPurple,
+                            color: primaryBlue,
                           ),
                           filled: true,
-                          fillColor: Colors.grey[50],
+                          fillColor: inputFill,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderSide: const BorderSide(color: cardBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: cardBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: primaryBlue,
+                              width: 1.4,
+                            ),
                           ),
                         ),
                       ),
@@ -1137,13 +1225,24 @@ class _ProfilePageState extends State<ProfilePage> {
                           labelText: "Qualifications",
                           prefixIcon: const Icon(
                             Icons.school,
-                            color: Colors.deepPurple,
+                            color: primaryBlue,
                           ),
                           filled: true,
-                          fillColor: Colors.grey[50],
+                          fillColor: inputFill,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderSide: const BorderSide(color: cardBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: cardBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: primaryBlue,
+                              width: 1.4,
+                            ),
                           ),
                         ),
                       ),
@@ -1169,11 +1268,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                 Container(
                                   height: 60,
                                   decoration: BoxDecoration(
-                                    color: Colors.grey[100],
+                                    color: inputFill,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.grey.shade200,
-                                    ),
+                                    border: Border.all(color: cardBorder),
                                   ),
                                   child: Row(
                                     children: [
@@ -1218,9 +1315,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                         icon: const Icon(Icons.draw, size: 18),
                                         label: const Text('Draw'),
                                         style: OutlinedButton.styleFrom(
-                                          foregroundColor: Colors.deepPurple,
+                                          foregroundColor: primaryBlueDark,
                                           side: const BorderSide(
-                                            color: Colors.deepPurple,
+                                            color: primaryBlue,
                                           ),
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(
@@ -1254,7 +1351,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                               : 'Upload',
                                         ),
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.deepPurple,
+                                          backgroundColor: primaryBlue,
                                           foregroundColor: Colors.white,
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(
@@ -1291,18 +1388,18 @@ class _ProfilePageState extends State<ProfilePage> {
                         icon: const Icon(
                           Icons.lock_reset,
                           size: 20,
-                          color: Colors.deepPurple,
+                          color: primaryBlueDark,
                         ),
                         label: const Text(
                           "Change Password",
                           style: TextStyle(
-                            color: Colors.deepPurple,
+                            color: primaryBlueDark,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color: Colors.deepPurple.withOpacity(0.35),
+                            color: primaryBlue.withOpacity(0.35),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
@@ -1323,7 +1420,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _canSave
-                              ? Colors.deepPurple
+                              ? primaryBlue
                               : Colors.grey.shade300,
                           disabledBackgroundColor: Colors.grey.shade300,
                           padding: const EdgeInsets.symmetric(vertical: 14),

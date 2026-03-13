@@ -73,6 +73,8 @@ doctor:
   - markReportReviewed:
   - revisePrescription:
   - getPatientPrescriptionList:
+  - getAppointmentRequests:
+  - updateAppointmentRequestStatus:
   - getPrescriptionDetails:
 lab:
   - getAnalyticsSnapshot:
@@ -104,6 +106,10 @@ patient:
   - getPatientProfile:
   - listTests:
   - getUserRole:
+  - createAppointmentRequest:
+  - getMyAppointmentRequests:
+  - cancelMyAppointmentRequest:
+  - rescheduleMyAppointmentRequest:
   - updatePatientProfile:
   - getMyLabReports:
   - getMyLabPaymentItems:

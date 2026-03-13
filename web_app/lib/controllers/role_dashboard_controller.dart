@@ -28,6 +28,7 @@ class RoleDashboardController extends ChangeNotifier {
   DoctorHomeData? doctorHome;
   DoctorProfile? doctorProfile;
   List<PatientPrescriptionListItem> doctorPrescriptionList = [];
+  List<AppointmentRequestItem> doctorAppointmentRequests = [];
 
   // Admin
   AdminDashboardOverview? adminOverview;
@@ -54,7 +55,6 @@ class RoleDashboardController extends ChangeNotifier {
   Future<void> loadPatient() => _load(() async {
     final profile = await _service.getPatientProfile();
     final doctors = await _service.getPatientDoctors();
-    final appointments = await _service.getPatientAppointments();
     final reports = await _service.getPatientReports();
     final labTests = await _service.getLabTests();
     final onDutyStaff = await _service.getOnDutyStaff();
@@ -63,9 +63,26 @@ class RoleDashboardController extends ChangeNotifier {
 
     patientProfile = profile;
     patientDoctors = doctors.map(DoctorModel.fromStaffInfo).toList();
-    patientAppointments = appointments
-        .map(AppointmentModel.fromPrescription)
-        .toList();
+    final doctorNameById = <int, String>{
+      for (final doctor in patientDoctors)
+        if (doctor.userId != null) doctor.userId!: doctor.name,
+    };
+    try {
+      final appointments = await _service.getPatientAppointments();
+      patientAppointments = appointments
+          .map(
+            (item) => AppointmentModel.fromAppointmentRequest(
+              item,
+              doctorNameById[item.doctorId] ?? 'Doctor #${item.doctorId}',
+            ),
+          )
+          .toList();
+    } catch (_) {
+      final legacy = await _service.getPatientAppointmentsLegacy();
+      patientAppointments = legacy
+          .map(AppointmentModel.fromPrescription)
+          .toList();
+    }
     patientReports = reports;
     patientLabTests = labTests;
     patientOnDutyStaff = onDutyStaff;
@@ -98,11 +115,27 @@ class RoleDashboardController extends ChangeNotifier {
 
     try {
       final appointments = await _service.getPatientAppointments();
+      final doctorNameById = <int, String>{
+        for (final doctor in patientDoctors)
+          if (doctor.userId != null) doctor.userId!: doctor.name,
+      };
       patientAppointments = appointments
-          .map(AppointmentModel.fromPrescription)
+          .map(
+            (item) => AppointmentModel.fromAppointmentRequest(
+              item,
+              doctorNameById[item.doctorId] ?? 'Doctor #${item.doctorId}',
+            ),
+          )
           .toList();
     } catch (e) {
-      error ??= e.toString();
+      try {
+        final legacy = await _service.getPatientAppointmentsLegacy();
+        patientAppointments = legacy
+            .map(AppointmentModel.fromPrescription)
+            .toList();
+      } catch (_) {
+        error ??= e.toString();
+      }
     }
 
     try {
@@ -158,7 +191,60 @@ class RoleDashboardController extends ChangeNotifier {
     doctorHome = await _service.getDoctorHome();
     doctorProfile = await _service.getDoctorProfile();
     doctorPrescriptionList = await _service.getDoctorPrescriptions();
+    try {
+      doctorAppointmentRequests = await _service.getDoctorAppointmentRequests(
+        limit: 200,
+        offset: 0,
+      );
+    } catch (_) {
+      doctorAppointmentRequests = const [];
+    }
   });
+
+  Future<void> loadDoctorAppointmentRequests({
+    String? status,
+    String? query,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      doctorAppointmentRequests = await _service.getDoctorAppointmentRequests(
+        status: status,
+        query: query,
+        limit: 200,
+        offset: 0,
+      );
+    } catch (e) {
+      error = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateDoctorAppointmentRequestStatus({
+    required int appointmentRequestId,
+    required String status,
+    String? declineReason,
+  }) async {
+    try {
+      final ok = await _service.updateDoctorAppointmentRequestStatus(
+        appointmentRequestId: appointmentRequestId,
+        status: status,
+        declineReason: declineReason,
+      );
+      if (ok) {
+        await loadDoctorAppointmentRequests();
+      }
+      return ok;
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
 
   Future<bool> updateDoctorProfile({
     required String name,
@@ -239,6 +325,18 @@ class RoleDashboardController extends ChangeNotifier {
       error = e.toString();
       notifyListeners();
       return -1;
+    }
+  }
+
+  Future<PatientPrescriptionDetails?> loadPrescriptionDetails(
+    int prescriptionId,
+  ) async {
+    try {
+      return await _service.getDoctorPrescriptionDetails(prescriptionId);
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      return null;
     }
   }
 

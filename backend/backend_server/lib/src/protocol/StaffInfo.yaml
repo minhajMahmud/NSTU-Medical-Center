@@ -1,5 +1,6 @@
 class: StaffInfo
 fields:
+  userId: int?
   name: String
   phone: String
   designation: String?

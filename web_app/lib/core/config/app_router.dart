@@ -163,6 +163,9 @@ GoRouter createAppRouter(AuthController auth) {
         path: '/doctor/prescriptions/create',
         builder: (_, state) => DoctorPrescriptionCreatorPage(
           patientId: state.uri.queryParameters['patientId'],
+          prescriptionId: int.tryParse(
+            state.uri.queryParameters['prescriptionId'] ?? '',
+          ),
           patientName: state.uri.queryParameters['name'],
           phone: state.uri.queryParameters['phone'],
           age: state.uri.queryParameters['age'],

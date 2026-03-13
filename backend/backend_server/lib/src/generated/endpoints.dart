@@ -2022,6 +2022,74 @@ class Endpoints extends _i1.EndpointDispatch {
                     offset: params['offset'],
                   ),
         ),
+        'getAppointmentRequests': _i1.MethodConnector(
+          name: 'getAppointmentRequests',
+          params: {
+            'status': _i1.ParameterDescription(
+              name: 'status',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'query': _i1.ParameterDescription(
+              name: 'query',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'offset': _i1.ParameterDescription(
+              name: 'offset',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
+                  .getAppointmentRequests(
+                    session,
+                    status: params['status'],
+                    query: params['query'],
+                    limit: params['limit'],
+                    offset: params['offset'],
+                  ),
+        ),
+        'updateAppointmentRequestStatus': _i1.MethodConnector(
+          name: 'updateAppointmentRequestStatus',
+          params: {
+            'appointmentRequestId': _i1.ParameterDescription(
+              name: 'appointmentRequestId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'status': _i1.ParameterDescription(
+              name: 'status',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'declineReason': _i1.ParameterDescription(
+              name: 'declineReason',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
+                  .updateAppointmentRequestStatus(
+                    session,
+                    appointmentRequestId: params['appointmentRequestId'],
+                    status: params['status'],
+                    declineReason: params['declineReason'],
+                  ),
+        ),
         'getPrescriptionDetails': _i1.MethodConnector(
           name: 'getPrescriptionDetails',
           params: {
@@ -2539,6 +2607,133 @@ class Endpoints extends _i1.EndpointDispatch {
                 Map<String, dynamic> params,
               ) async => (endpoints['patient'] as _i11.PatientEndpoint)
                   .getUserRole(session),
+        ),
+        'createAppointmentRequest': _i1.MethodConnector(
+          name: 'createAppointmentRequest',
+          params: {
+            'doctorId': _i1.ParameterDescription(
+              name: 'doctorId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'appointmentDate': _i1.ParameterDescription(
+              name: 'appointmentDate',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+            'appointmentTime': _i1.ParameterDescription(
+              name: 'appointmentTime',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'reason': _i1.ParameterDescription(
+              name: 'reason',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'notes': _i1.ParameterDescription(
+              name: 'notes',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'urgent': _i1.ParameterDescription(
+              name: 'urgent',
+              type: _i1.getType<bool>(),
+              nullable: false,
+            ),
+            'mode': _i1.ParameterDescription(
+              name: 'mode',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
+                  .createAppointmentRequest(
+                    session,
+                    doctorId: params['doctorId'],
+                    appointmentDate: params['appointmentDate'],
+                    appointmentTime: params['appointmentTime'],
+                    reason: params['reason'],
+                    notes: params['notes'],
+                    urgent: params['urgent'],
+                    mode: params['mode'],
+                  ),
+        ),
+        'getMyAppointmentRequests': _i1.MethodConnector(
+          name: 'getMyAppointmentRequests',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
+                  .getMyAppointmentRequests(session),
+        ),
+        'cancelMyAppointmentRequest': _i1.MethodConnector(
+          name: 'cancelMyAppointmentRequest',
+          params: {
+            'appointmentRequestId': _i1.ParameterDescription(
+              name: 'appointmentRequestId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'reason': _i1.ParameterDescription(
+              name: 'reason',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
+                  .cancelMyAppointmentRequest(
+                    session,
+                    appointmentRequestId: params['appointmentRequestId'],
+                    reason: params['reason'],
+                  ),
+        ),
+        'rescheduleMyAppointmentRequest': _i1.MethodConnector(
+          name: 'rescheduleMyAppointmentRequest',
+          params: {
+            'appointmentRequestId': _i1.ParameterDescription(
+              name: 'appointmentRequestId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'appointmentDate': _i1.ParameterDescription(
+              name: 'appointmentDate',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+            'appointmentTime': _i1.ParameterDescription(
+              name: 'appointmentTime',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'notes': _i1.ParameterDescription(
+              name: 'notes',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['patient'] as _i11.PatientEndpoint)
+                  .rescheduleMyAppointmentRequest(
+                    session,
+                    appointmentRequestId: params['appointmentRequestId'],
+                    appointmentDate: params['appointmentDate'],
+                    appointmentTime: params['appointmentTime'],
+                    notes: params['notes'],
+                  ),
         ),
         'updatePatientProfile': _i1.MethodConnector(
           name: 'updatePatientProfile',

@@ -86,7 +86,12 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
 
     if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image upload failed. Please try again.')),
+        SnackBar(
+          content: Text(
+            CloudinaryUpload.lastErrorMessage ??
+                'Image upload failed. Please try again.',
+          ),
+        ),
       );
       return;
     }
@@ -373,7 +378,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                       TextButton.icon(
                         onPressed: () => context.go('/patient/appointments'),
                         icon: const Icon(Icons.description_outlined),
-                        label: const Text('All Prescriptions'),
+                        label: const Text('All Appointments'),
                       ),
                       const SizedBox(width: 8),
                       TextButton.icon(
@@ -391,14 +396,14 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Doctor Prescriptions',
+                            'Appointment Requests',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(height: 8),
                           if (c.patientAppointments.isEmpty)
-                            const Text('No prescriptions found yet.')
+                            const Text('No appointment requests found yet.')
                           else
                             ...c.patientAppointments
                                 .take(5)
@@ -409,11 +414,15 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                                       backgroundColor: Color(0xFFE8F1FF),
                                       child: Icon(Icons.description_outlined),
                                     ),
-                                    title: Text('Prescription #${p.id}'),
+                                    title: Text('Appointment #${p.id}'),
                                     subtitle: Text(
-                                      'Doctor: Dr. ${p.doctorName}\nDate: ${DateFormat('dd MMM yyyy').format(p.date.toLocal())}',
+                                      'Doctor: Dr. ${p.doctorName}\nDate: ${DateFormat('dd MMM yyyy').format(p.date.toLocal())}${p.timeLabel != null ? ' • ${p.timeLabel}' : ''}',
                                     ),
-                                    trailing: const Chip(label: Text('Doctor')),
+                                    trailing: Chip(
+                                      label: Text(
+                                        (p.status ?? 'PENDING').toUpperCase(),
+                                      ),
+                                    ),
                                     isThreeLine: true,
                                   ),
                                 ),

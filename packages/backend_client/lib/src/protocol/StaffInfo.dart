@@ -14,6 +14,7 @@ import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
 abstract class StaffInfo implements _i1.SerializableModel {
   StaffInfo._({
+    this.userId,
     required this.name,
     required this.phone,
     this.designation,
@@ -22,6 +23,7 @@ abstract class StaffInfo implements _i1.SerializableModel {
   });
 
   factory StaffInfo({
+    int? userId,
     required String name,
     required String phone,
     String? designation,
@@ -31,6 +33,7 @@ abstract class StaffInfo implements _i1.SerializableModel {
 
   factory StaffInfo.fromJson(Map<String, dynamic> jsonSerialization) {
     return StaffInfo(
+      userId: jsonSerialization['userId'] as int?,
       name: jsonSerialization['name'] as String,
       phone: jsonSerialization['phone'] as String,
       designation: jsonSerialization['designation'] as String?,
@@ -38,6 +41,8 @@ abstract class StaffInfo implements _i1.SerializableModel {
       qualification: jsonSerialization['qualification'] as String?,
     );
   }
+
+  int? userId;
 
   String name;
 
@@ -53,6 +58,7 @@ abstract class StaffInfo implements _i1.SerializableModel {
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   StaffInfo copyWith({
+    int? userId,
     String? name,
     String? phone,
     String? designation,
@@ -63,6 +69,7 @@ abstract class StaffInfo implements _i1.SerializableModel {
   Map<String, dynamic> toJson() {
     return {
       '__className__': 'StaffInfo',
+      if (userId != null) 'userId': userId,
       'name': name,
       'phone': phone,
       if (designation != null) 'designation': designation,
@@ -81,12 +88,14 @@ class _Undefined {}
 
 class _StaffInfoImpl extends StaffInfo {
   _StaffInfoImpl({
+    int? userId,
     required String name,
     required String phone,
     String? designation,
     String? profilePictureUrl,
     String? qualification,
   }) : super._(
+         userId: userId,
          name: name,
          phone: phone,
          designation: designation,
@@ -99,6 +108,7 @@ class _StaffInfoImpl extends StaffInfo {
   @_i1.useResult
   @override
   StaffInfo copyWith({
+    Object? userId = _Undefined,
     String? name,
     String? phone,
     Object? designation = _Undefined,
@@ -106,6 +116,7 @@ class _StaffInfoImpl extends StaffInfo {
     Object? qualification = _Undefined,
   }) {
     return StaffInfo(
+      userId: userId is int? ? userId : this.userId,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       designation: designation is String? ? designation : this.designation,

@@ -6,6 +6,41 @@ class DoctorEndpoint extends Endpoint {
   @override
   bool get requireLogin => true;
 
+  Future<void> _ensureAppointmentTables(Session session) async {
+    await session.db.unsafeExecute('''
+      CREATE TABLE IF NOT EXISTS appointment_requests (
+        request_id SERIAL PRIMARY KEY,
+        patient_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+        doctor_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+        appointment_date DATE NOT NULL,
+        appointment_time TIME WITHOUT TIME ZONE NOT NULL,
+        reason TEXT NOT NULL,
+        notes TEXT,
+        mode TEXT NOT NULL DEFAULT 'In-Person',
+        is_urgent BOOLEAN NOT NULL DEFAULT FALSE,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        decline_reason TEXT,
+        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+        acted_at TIMESTAMP WITHOUT TIME ZONE,
+        CONSTRAINT appointment_requests_status_check
+          CHECK (status IN ('PENDING', 'CONFIRMED', 'DECLINED')),
+        CONSTRAINT appointment_requests_mode_check
+          CHECK (mode IN ('In-Person', 'Video', 'Phone'))
+      )
+    ''');
+
+    await session.db.unsafeExecute('''
+      CREATE INDEX IF NOT EXISTS idx_appointment_requests_doctor_status_date
+      ON appointment_requests (doctor_id, status, appointment_date, appointment_time)
+    ''');
+
+    await session.db.unsafeExecute('''
+      CREATE INDEX IF NOT EXISTS idx_appointment_requests_patient_created
+      ON appointment_requests (patient_id, created_at DESC)
+    ''');
+  }
+
   /// Doctor home dashboard data
 // ----------------------------
   Future<DoctorHomeData> getDoctorHomeData(Session session) async {
@@ -616,14 +651,14 @@ class DoctorEndpoint extends Endpoint {
         );
       }
 
-      // Insert prescription - Matches your SQL Table
+      // Insert prescription
       final res = await session.db.unsafeQuery('''
     INSERT INTO prescriptions (
       patient_id, doctor_id, name, age, mobile_number, gender,
-      prescription_date, cc, oe, advice, test, next_visit, is_outside
+      prescription_date, cc, oe, bp, temperature, advice, test, next_visit, is_outside
     ) VALUES (
       @pid, @did, @name, @age, @mobile, @gender,
-      @pdate, @cc, @oe, @advice, @test, @nextVisit, @iso
+      @pdate, @cc, @oe, @bp, @temperature, @advice, @test, @nextVisit, @iso
     ) RETURNING prescription_id
     ''',
           parameters: QueryParameters.named({
@@ -636,6 +671,8 @@ class DoctorEndpoint extends Endpoint {
             'pdate': prescription.prescriptionDate ?? DateTime.now(),
             'cc': prescription.cc,
             'oe': prescription.oe,
+            'bp': prescription.bp,
+            'temperature': prescription.temperature,
             'advice': prescription.advice,
             'test': prescription.test,
             'nextVisit': prescription.nextVisit,
@@ -774,10 +811,10 @@ class DoctorEndpoint extends Endpoint {
       final res = await session.db.unsafeQuery('''
       INSERT INTO prescriptions (
         patient_id, doctor_id, name, age, mobile_number, gender,
-        cc, oe, advice, test, revised_from_id
+        cc, oe, bp, temperature, advice, test, revised_from_id
       ) VALUES (
         @pid, @did, @name, @age, @mobile, @gender,
-        @cc, @oe, @advice, @test, @revisedId
+        @cc, @oe, @bp, @temperature, @advice, @test, @revisedId
       ) RETURNING prescription_id
     ''',
           parameters: QueryParameters.named({
@@ -789,6 +826,8 @@ class DoctorEndpoint extends Endpoint {
             'gender': pData['gender'],
             'cc': pData['cc'],
             'oe': pData['oe'],
+            'bp': pData['bp'],
+            'temperature': pData['temperature'],
             'advice': newAdvice,
             'test': pData['test'],
             'revisedId': originalPrescriptionId,
@@ -893,6 +932,127 @@ class DoctorEndpoint extends Endpoint {
     }).toList();
   }
 
+  Future<List<AppointmentRequestItem>> getAppointmentRequests(
+    Session session, {
+    String? status,
+    String? query,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final resolvedDoctorId = requireAuthenticatedUserId(session);
+    await _ensureAppointmentTables(session);
+
+    final normalizedStatus = (status ?? '').trim().toUpperCase();
+    final validStatus = normalizedStatus == 'PENDING' ||
+            normalizedStatus == 'CONFIRMED' ||
+            normalizedStatus == 'DECLINED'
+        ? normalizedStatus
+        : '';
+    final q = (query ?? '').trim();
+
+    final rows = await session.db.unsafeQuery(
+      r'''
+      SELECT
+        ar.request_id,
+        ar.patient_id,
+        ar.doctor_id,
+        COALESCE(u.name, '') AS patient_name,
+        COALESCE(u.phone, '') AS patient_phone,
+        ar.appointment_date,
+        to_char(ar.appointment_time, 'HH24:MI') AS appointment_time,
+        ar.reason,
+        ar.notes,
+        ar.mode,
+        ar.is_urgent,
+        ar.status,
+        ar.decline_reason,
+        ar.created_at,
+        ar.acted_at
+      FROM appointment_requests ar
+      JOIN users u ON u.user_id = ar.patient_id
+      WHERE ar.doctor_id = @did
+        AND (@status = '' OR ar.status = @status)
+        AND (
+          @q = '' OR
+          LOWER(u.name) LIKE LOWER(@likeQ) OR
+          LOWER(ar.reason) LIKE LOWER(@likeQ) OR
+          REPLACE(REPLACE(COALESCE(u.phone, ''), ' ', ''), '-', '') LIKE @phoneLike
+        )
+      ORDER BY ar.appointment_date ASC, ar.appointment_time ASC, ar.request_id DESC
+      LIMIT @limit OFFSET @offset
+      ''',
+      parameters: QueryParameters.named({
+        'did': resolvedDoctorId,
+        'status': validStatus,
+        'q': q,
+        'likeQ': '%$q%',
+        'phoneLike': '%${q.replaceAll(RegExp(r'[^0-9]'), '')}%',
+        'limit': limit,
+        'offset': offset,
+      }),
+    );
+
+    return rows.map((r) {
+      final m = r.toColumnMap();
+      return AppointmentRequestItem(
+        appointmentRequestId: m['request_id'] as int,
+        patientId: m['patient_id'] as int,
+        doctorId: m['doctor_id'] as int,
+        patientName: _s(m['patient_name']),
+        patientPhone: _s(m['patient_phone']),
+        appointmentDate: m['appointment_date'] as DateTime,
+        appointmentTime: _s(m['appointment_time']),
+        reason: _s(m['reason']),
+        notes: m['notes']?.toString(),
+        mode: _s(m['mode']).isEmpty ? 'In-Person' : _s(m['mode']),
+        urgent: m['is_urgent'] as bool? ?? false,
+        status: _s(m['status']),
+        declineReason: m['decline_reason']?.toString(),
+        createdAt: m['created_at'] as DateTime? ?? DateTime.now(),
+        actedAt: m['acted_at'] as DateTime?,
+      );
+    }).toList();
+  }
+
+  Future<bool> updateAppointmentRequestStatus(
+    Session session, {
+    required int appointmentRequestId,
+    required String status,
+    String? declineReason,
+  }) async {
+    final resolvedDoctorId = requireAuthenticatedUserId(session);
+    await _ensureAppointmentTables(session);
+
+    final normalizedStatus = status.trim().toUpperCase();
+    if (normalizedStatus != 'CONFIRMED' && normalizedStatus != 'DECLINED') {
+      throw Exception('Invalid status. Use CONFIRMED or DECLINED.');
+    }
+
+    final updated = await session.db.unsafeExecute(
+      '''
+      UPDATE appointment_requests
+      SET
+        status = @status,
+        decline_reason = CASE WHEN @status = 'DECLINED' THEN @declineReason ELSE NULL END,
+        updated_at = NOW(),
+        acted_at = NOW()
+      WHERE request_id = @id
+        AND doctor_id = @did
+        AND status = 'PENDING'
+      ''',
+      parameters: QueryParameters.named({
+        'status': normalizedStatus,
+        'declineReason': declineReason?.trim().isEmpty == true
+            ? null
+            : declineReason?.trim(),
+        'id': appointmentRequestId,
+        'did': resolvedDoctorId,
+      }),
+    );
+
+    return updated > 0;
+  }
+
   /// Bottom sheet: single prescription full details + medicines
   Future<PatientPrescriptionDetails?> getPrescriptionDetails(
     Session session, {
@@ -908,6 +1068,8 @@ class DoctorEndpoint extends Endpoint {
         age,
         cc,
         oe,
+        bp,
+        temperature,
         advice,
         test
       FROM prescriptions
@@ -948,6 +1110,8 @@ class DoctorEndpoint extends Endpoint {
       age: p['age'] as int?,
       cc: p['cc']?.toString(),
       oe: p['oe']?.toString(),
+      bp: p['bp']?.toString(),
+      temperature: p['temperature']?.toString(),
       advice: p['advice']?.toString(),
       test: p['test']?.toString(),
       items: items,

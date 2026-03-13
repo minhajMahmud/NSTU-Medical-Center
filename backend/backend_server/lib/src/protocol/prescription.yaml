@@ -11,6 +11,8 @@ fields:
   prescriptionDate: DateTime?
   cc: String?
   oe: String?
+  bp: String?
+  temperature: String?
   advice: String?
   test: String?
   nextVisit: String?

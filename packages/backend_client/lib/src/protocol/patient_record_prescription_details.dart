@@ -23,6 +23,8 @@ abstract class PatientPrescriptionDetails implements _i1.SerializableModel {
     this.age,
     this.cc,
     this.oe,
+    this.bp,
+    this.temperature,
     this.advice,
     this.test,
     required this.items,
@@ -36,6 +38,8 @@ abstract class PatientPrescriptionDetails implements _i1.SerializableModel {
     int? age,
     String? cc,
     String? oe,
+    String? bp,
+    String? temperature,
     String? advice,
     String? test,
     required List<_i2.PatientPrescribedItem> items,
@@ -52,6 +56,8 @@ abstract class PatientPrescriptionDetails implements _i1.SerializableModel {
       age: jsonSerialization['age'] as int?,
       cc: jsonSerialization['cc'] as String?,
       oe: jsonSerialization['oe'] as String?,
+      bp: jsonSerialization['bp'] as String?,
+      temperature: jsonSerialization['temperature'] as String?,
       advice: jsonSerialization['advice'] as String?,
       test: jsonSerialization['test'] as String?,
       items: _i3.Protocol().deserialize<List<_i2.PatientPrescribedItem>>(
@@ -74,6 +80,10 @@ abstract class PatientPrescriptionDetails implements _i1.SerializableModel {
 
   String? oe;
 
+  String? bp;
+
+  String? temperature;
+
   String? advice;
 
   String? test;
@@ -91,6 +101,8 @@ abstract class PatientPrescriptionDetails implements _i1.SerializableModel {
     int? age,
     String? cc,
     String? oe,
+    String? bp,
+    String? temperature,
     String? advice,
     String? test,
     List<_i2.PatientPrescribedItem>? items,
@@ -106,6 +118,8 @@ abstract class PatientPrescriptionDetails implements _i1.SerializableModel {
       if (age != null) 'age': age,
       if (cc != null) 'cc': cc,
       if (oe != null) 'oe': oe,
+      if (bp != null) 'bp': bp,
+      if (temperature != null) 'temperature': temperature,
       if (advice != null) 'advice': advice,
       if (test != null) 'test': test,
       'items': items.toJson(valueToJson: (v) => v.toJson()),
@@ -129,6 +143,8 @@ class _PatientPrescriptionDetailsImpl extends PatientPrescriptionDetails {
     int? age,
     String? cc,
     String? oe,
+    String? bp,
+    String? temperature,
     String? advice,
     String? test,
     required List<_i2.PatientPrescribedItem> items,
@@ -140,6 +156,8 @@ class _PatientPrescriptionDetailsImpl extends PatientPrescriptionDetails {
          age: age,
          cc: cc,
          oe: oe,
+         bp: bp,
+         temperature: temperature,
          advice: advice,
          test: test,
          items: items,
@@ -157,6 +175,8 @@ class _PatientPrescriptionDetailsImpl extends PatientPrescriptionDetails {
     Object? age = _Undefined,
     Object? cc = _Undefined,
     Object? oe = _Undefined,
+    Object? bp = _Undefined,
+    Object? temperature = _Undefined,
     Object? advice = _Undefined,
     Object? test = _Undefined,
     List<_i2.PatientPrescribedItem>? items,
@@ -169,6 +189,8 @@ class _PatientPrescriptionDetailsImpl extends PatientPrescriptionDetails {
       age: age is int? ? age : this.age,
       cc: cc is String? ? cc : this.cc,
       oe: oe is String? ? oe : this.oe,
+      bp: bp is String? ? bp : this.bp,
+      temperature: temperature is String? ? temperature : this.temperature,
       advice: advice is String? ? advice : this.advice,
       test: test is String? ? test : this.test,
       items: items ?? this.items.map((e0) => e0.copyWith()).toList(),

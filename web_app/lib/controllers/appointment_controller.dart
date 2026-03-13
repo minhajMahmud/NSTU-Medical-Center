@@ -24,19 +24,97 @@ class AppointmentController extends ChangeNotifier {
 
     try {
       final doctorRows = await _service.getDoctors();
-      final appointmentRows = await _service.getAppointments();
-      final reportRows = await _service.getMedicalReports();
-
       doctors = doctorRows.map(DoctorModel.fromStaffInfo).toList();
-      appointments = appointmentRows
-          .map(AppointmentModel.fromPrescription)
-          .toList();
-      reports = reportRows;
-    } catch (_) {
-      error = 'Failed to load data from backend.';
+    } catch (e) {
+      error = 'Failed to load doctors from backend.';
+      debugPrint('loadDashboardData doctors failed: $e');
+    }
+
+    try {
+      final doctorNameById = <int, String>{
+        for (final doctor in doctors)
+          if (doctor.userId != null) doctor.userId!: doctor.name,
+      };
+      appointments = await _service.getAppointments(
+        doctorNameById: doctorNameById,
+      );
+    } catch (e) {
+      error ??= 'Failed to load appointment requests.';
+      debugPrint('loadDashboardData appointments failed: $e');
+    }
+
+    try {
+      reports = await _service.getMedicalReports();
+    } catch (e) {
+      debugPrint('loadDashboardData reports failed: $e');
     } finally {
       isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<int> createAppointmentRequest({
+    required int doctorId,
+    required DateTime appointmentDate,
+    required String appointmentTimeLabel,
+    required String reason,
+    String? notes,
+    required bool urgent,
+    String mode = 'In-Person',
+  }) async {
+    try {
+      final requestId = await _service.createAppointmentRequest(
+        doctorId: doctorId,
+        appointmentDate: appointmentDate,
+        appointmentTimeLabel: appointmentTimeLabel,
+        reason: reason,
+        notes: notes,
+        urgent: urgent,
+        mode: mode,
+      );
+      return requestId;
+    } catch (_) {
+      return -1;
+    }
+  }
+
+  Future<bool> cancelMyAppointmentRequest({
+    required int appointmentRequestId,
+    String? reason,
+  }) async {
+    try {
+      final ok = await _service.cancelMyAppointmentRequest(
+        appointmentRequestId: appointmentRequestId,
+        reason: reason,
+      );
+      if (ok) {
+        await loadDashboardData();
+      }
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> rescheduleMyAppointmentRequest({
+    required int appointmentRequestId,
+    required DateTime appointmentDate,
+    required String appointmentTimeLabel,
+    String? notes,
+  }) async {
+    try {
+      final ok = await _service.rescheduleMyAppointmentRequest(
+        appointmentRequestId: appointmentRequestId,
+        appointmentDate: appointmentDate,
+        appointmentTimeLabel: appointmentTimeLabel,
+        notes: notes,
+      );
+      if (ok) {
+        await loadDashboardData();
+      }
+      return ok;
+    } catch (_) {
+      return false;
     }
   }
 }

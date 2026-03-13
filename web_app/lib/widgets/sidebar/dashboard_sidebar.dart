@@ -89,10 +89,10 @@ class DashboardSidebar extends StatelessWidget {
             selectedIcon: Icons.dashboard,
           ),
           _NavItem(
-            route: '/patient/profile',
-            label: 'Profile',
-            icon: Icons.person_outline,
-            selectedIcon: Icons.person,
+            route: '/patient/reports',
+            label: 'My Reports',
+            icon: Icons.description_outlined,
+            selectedIcon: Icons.description,
           ),
           _NavItem(
             route: '/patient/appointments',
@@ -101,10 +101,10 @@ class DashboardSidebar extends StatelessWidget {
             selectedIcon: Icons.event_note,
           ),
           _NavItem(
-            route: '/patient/reports',
-            label: 'Reports',
-            icon: Icons.description_outlined,
-            selectedIcon: Icons.description,
+            route: '/patient/profile',
+            label: 'Profile',
+            icon: Icons.person_outline,
+            selectedIcon: Icons.person,
           ),
           _NavItem(
             route: '/patient/lab-tests',

@@ -169,6 +169,8 @@ CREATE TABLE IF NOT EXISTS prescriptions (
   prescription_date DATE NOT NULL DEFAULT CURRENT_DATE,
   cc TEXT,
   oe TEXT,
+  bp TEXT,
+  temperature TEXT,
   advice TEXT,
   test TEXT,
   next_visit TEXT,

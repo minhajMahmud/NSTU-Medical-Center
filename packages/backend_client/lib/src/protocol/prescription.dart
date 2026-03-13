@@ -25,6 +25,8 @@ abstract class Prescription implements _i1.SerializableModel {
     this.prescriptionDate,
     this.cc,
     this.oe,
+    this.bp,
+    this.temperature,
     this.advice,
     this.test,
     this.nextVisit,
@@ -44,6 +46,8 @@ abstract class Prescription implements _i1.SerializableModel {
     DateTime? prescriptionDate,
     String? cc,
     String? oe,
+    String? bp,
+    String? temperature,
     String? advice,
     String? test,
     String? nextVisit,
@@ -68,6 +72,8 @@ abstract class Prescription implements _i1.SerializableModel {
             ),
       cc: jsonSerialization['cc'] as String?,
       oe: jsonSerialization['oe'] as String?,
+      bp: jsonSerialization['bp'] as String?,
+      temperature: jsonSerialization['temperature'] as String?,
       advice: jsonSerialization['advice'] as String?,
       test: jsonSerialization['test'] as String?,
       nextVisit: jsonSerialization['nextVisit'] as String?,
@@ -100,6 +106,10 @@ abstract class Prescription implements _i1.SerializableModel {
 
   String? oe;
 
+  String? bp;
+
+  String? temperature;
+
   String? advice;
 
   String? test;
@@ -125,6 +135,8 @@ abstract class Prescription implements _i1.SerializableModel {
     DateTime? prescriptionDate,
     String? cc,
     String? oe,
+    String? bp,
+    String? temperature,
     String? advice,
     String? test,
     String? nextVisit,
@@ -147,6 +159,8 @@ abstract class Prescription implements _i1.SerializableModel {
         'prescriptionDate': prescriptionDate?.toJson(),
       if (cc != null) 'cc': cc,
       if (oe != null) 'oe': oe,
+      if (bp != null) 'bp': bp,
+      if (temperature != null) 'temperature': temperature,
       if (advice != null) 'advice': advice,
       if (test != null) 'test': test,
       if (nextVisit != null) 'nextVisit': nextVisit,
@@ -176,6 +190,8 @@ class _PrescriptionImpl extends Prescription {
     DateTime? prescriptionDate,
     String? cc,
     String? oe,
+    String? bp,
+    String? temperature,
     String? advice,
     String? test,
     String? nextVisit,
@@ -193,6 +209,8 @@ class _PrescriptionImpl extends Prescription {
          prescriptionDate: prescriptionDate,
          cc: cc,
          oe: oe,
+         bp: bp,
+         temperature: temperature,
          advice: advice,
          test: test,
          nextVisit: nextVisit,
@@ -216,6 +234,8 @@ class _PrescriptionImpl extends Prescription {
     Object? prescriptionDate = _Undefined,
     Object? cc = _Undefined,
     Object? oe = _Undefined,
+    Object? bp = _Undefined,
+    Object? temperature = _Undefined,
     Object? advice = _Undefined,
     Object? test = _Undefined,
     Object? nextVisit = _Undefined,
@@ -236,6 +256,8 @@ class _PrescriptionImpl extends Prescription {
           : this.prescriptionDate,
       cc: cc is String? ? cc : this.cc,
       oe: oe is String? ? oe : this.oe,
+      bp: bp is String? ? bp : this.bp,
+      temperature: temperature is String? ? temperature : this.temperature,
       advice: advice is String? ? advice : this.advice,
       test: test is String? ? test : this.test,
       nextVisit: nextVisit is String? ? nextVisit : this.nextVisit,
