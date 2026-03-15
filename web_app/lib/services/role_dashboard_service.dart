@@ -39,6 +39,11 @@ class RoleDashboardService {
       _client.patient.getMyAppointmentRequests();
   Future<List<PrescriptionList>> getPatientAppointmentsLegacy() =>
       _client.patient.getMyPrescriptionList();
+  Future<List<PrescriptionList>> getPatientPrescriptions() =>
+      _client.patient.getMyPrescriptionList();
+  Future<PrescriptionDetail?> getPatientPrescriptionDetail(
+    int prescriptionId,
+  ) => _client.patient.getPrescriptionDetail(prescriptionId);
   Future<List<PatientReportDto>> getPatientReports() =>
       _client.patient.getMyLabReports();
   Future<List<LabTests>> getLabTests() => _client.patient.listTests();
@@ -48,6 +53,12 @@ class RoleDashboardService {
       _client.patient.getAmbulanceContacts();
   Future<List<NotificationInfo>> getPatientNotifications() =>
       _client.notification.getMyNotifications(limit: 50);
+  Future<Map<String, int>> getNotificationCounts() =>
+      _client.notification.getMyNotificationCounts();
+  Future<bool> markNotificationAsRead(int notificationId) =>
+      _client.notification.markAsRead(notificationId: notificationId);
+  Future<bool> markAllNotificationsAsRead() =>
+      _client.notification.markAllAsRead();
 
   Future<String> updatePatientProfile({
     required String name,

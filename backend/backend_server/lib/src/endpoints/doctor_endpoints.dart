@@ -702,6 +702,24 @@ class DoctorEndpoint extends Endpoint {
             }));
       }
 
+      await session.db.unsafeExecute(
+        '''
+        INSERT INTO notifications (user_id, title, message, is_read, created_at)
+        VALUES (
+          @patientId,
+          'New Prescription',
+          @message,
+          FALSE,
+          NOW()
+        )
+        ''',
+        parameters: QueryParameters.named({
+          'patientId': foundPatientId,
+          'message':
+              'A new prescription has been added to your account. Prescription ID: $prescriptionId',
+        }),
+      );
+
       await session.db.unsafeExecute('COMMIT');
       return prescriptionId;
     } catch (e, st) {

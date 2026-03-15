@@ -93,7 +93,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     OutlinedButton.icon(
                       onPressed: () => context.go('/patient/reports'),
                       icon: const Icon(Icons.download_rounded),
-                      label: const Text('Medical Summary'),
+                      label: const Text('Prescriptions & Reports'),
                     ),
                   ],
                 ),
@@ -113,9 +113,9 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                     const SizedBox(width: 14),
                     Expanded(
                       child: _QuickActionCard(
-                        title: 'View Lab Reports',
+                        title: 'View Prescriptions & Reports',
                         subtitle:
-                            'Access and download your latest medical tests.',
+                            'Access and download your prescriptions and reports.',
                         icon: Icons.description_outlined,
                         onTap: () => context.go('/patient/reports'),
                       ),
@@ -270,7 +270,7 @@ class _RecentReportsCard extends StatelessWidget {
                 const Spacer(),
                 TextButton(
                   onPressed: () => context.go('/patient/reports'),
-                  child: const Text('View All Reports'),
+                  child: const Text('View Prescriptions & Reports'),
                 ),
               ],
             ),

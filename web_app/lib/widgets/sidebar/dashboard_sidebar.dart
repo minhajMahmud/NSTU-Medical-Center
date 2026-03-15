@@ -90,7 +90,7 @@ class DashboardSidebar extends StatelessWidget {
           ),
           _NavItem(
             route: '/patient/reports',
-            label: 'My Reports',
+            label: 'Prescriptions & Reports',
             icon: Icons.description_outlined,
             selectedIcon: Icons.description,
           ),

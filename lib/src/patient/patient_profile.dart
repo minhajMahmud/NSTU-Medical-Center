@@ -383,7 +383,7 @@ class _PatientProfilePageState extends State<PatientProfilePage>
       final dobToSend = _dateOfBirth == null
           ? null
           : AppDateTime.utcDateOnly(_dateOfBirth!);
-      await client.patient.updatePatientProfile(
+      final updateRes = await client.patient.updatePatientProfile(
         _nameController.text.trim(),
         normalizedPhone,
         _bloodGroupController.text.isEmpty ? null : _bloodGroupController.text,
@@ -391,6 +391,10 @@ class _PatientProfilePageState extends State<PatientProfilePage>
         _gender,
         imageUrl,
       );
+
+      if (updateRes.trim().toLowerCase() != 'profile updated successfully') {
+        throw Exception(updateRes);
+      }
 
       _profileImageBytes = null;
       await _loadProfileData();

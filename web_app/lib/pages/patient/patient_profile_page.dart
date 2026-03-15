@@ -384,7 +384,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                       TextButton.icon(
                         onPressed: () => context.go('/patient/reports'),
                         icon: const Icon(Icons.science_outlined),
-                        label: const Text('All Reports'),
+                        label: const Text('Prescriptions & Reports'),
                       ),
                     ],
                   ),

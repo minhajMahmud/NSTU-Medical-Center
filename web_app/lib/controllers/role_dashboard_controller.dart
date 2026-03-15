@@ -1,4 +1,5 @@
 import 'package:backend_client/backend_client.dart';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/appointment.dart';
@@ -18,6 +19,7 @@ class RoleDashboardController extends ChangeNotifier {
   PatientProfile? patientProfile;
   List<DoctorModel> patientDoctors = [];
   List<AppointmentModel> patientAppointments = [];
+  List<PrescriptionList> patientPrescriptions = [];
   List<PatientReportDto> patientReports = [];
   List<LabTests> patientLabTests = [];
   List<OndutyStaff> patientOnDutyStaff = [];
@@ -52,9 +54,13 @@ class RoleDashboardController extends ChangeNotifier {
   List<InventoryItemInfo> dispenserStock = [];
   List<DispenseHistoryEntry> dispenserHistory = [];
 
+  int unreadNotificationCount = 0;
+  Timer? _notificationTimer;
+
   Future<void> loadPatient() => _load(() async {
     final profile = await _service.getPatientProfile();
     final doctors = await _service.getPatientDoctors();
+    final prescriptions = await _service.getPatientPrescriptions();
     final reports = await _service.getPatientReports();
     final labTests = await _service.getLabTests();
     final onDutyStaff = await _service.getOnDutyStaff();
@@ -84,11 +90,102 @@ class RoleDashboardController extends ChangeNotifier {
           .toList();
     }
     patientReports = reports;
+    patientPrescriptions = prescriptions;
     patientLabTests = labTests;
     patientOnDutyStaff = onDutyStaff;
     patientAmbulanceContacts = ambulance;
     patientNotifications = notifications;
+    unreadNotificationCount = notifications.where((n) => !n.isRead).length;
   });
+
+  Future<void> refreshNotifications({
+    int limit = 30,
+    bool silent = false,
+  }) async {
+    if (!silent) {
+      isLoading = true;
+      notifyListeners();
+    }
+    try {
+      final notifications = await _service.getPatientNotifications();
+      patientNotifications = notifications.take(limit).toList();
+      unreadNotificationCount = patientNotifications
+          .where((n) => !n.isRead)
+          .length;
+    } catch (e) {
+      error = e.toString();
+    } finally {
+      if (!silent) {
+        isLoading = false;
+      }
+      notifyListeners();
+    }
+  }
+
+  Future<void> markNotificationAsRead(int notificationId) async {
+    try {
+      final ok = await _service.markNotificationAsRead(notificationId);
+      if (!ok) return;
+      patientNotifications = patientNotifications.map((n) {
+        if (n.notificationId == notificationId) {
+          return NotificationInfo(
+            notificationId: n.notificationId,
+            userId: n.userId,
+            title: n.title,
+            message: n.message,
+            isRead: true,
+            createdAt: n.createdAt,
+          );
+        }
+        return n;
+      }).toList();
+      unreadNotificationCount = patientNotifications
+          .where((n) => !n.isRead)
+          .length;
+      notifyListeners();
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> markAllNotificationsAsRead() async {
+    try {
+      final ok = await _service.markAllNotificationsAsRead();
+      if (!ok) return;
+      patientNotifications = patientNotifications
+          .map(
+            (n) => NotificationInfo(
+              notificationId: n.notificationId,
+              userId: n.userId,
+              title: n.title,
+              message: n.message,
+              isRead: true,
+              createdAt: n.createdAt,
+            ),
+          )
+          .toList();
+      unreadNotificationCount = 0;
+      notifyListeners();
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+    }
+  }
+
+  void startNotificationRealtimeSync({
+    Duration interval = const Duration(seconds: 10),
+  }) {
+    _notificationTimer ??= Timer.periodic(interval, (_) {
+      refreshNotifications(silent: true);
+    });
+    refreshNotifications(silent: true);
+  }
+
+  void stopNotificationRealtimeSync() {
+    _notificationTimer?.cancel();
+    _notificationTimer = null;
+  }
 
   /// Loads only patient profile data.
   ///
@@ -139,6 +236,12 @@ class RoleDashboardController extends ChangeNotifier {
     }
 
     try {
+      patientPrescriptions = await _service.getPatientPrescriptions();
+    } catch (e) {
+      error ??= e.toString();
+    }
+
+    try {
       patientReports = await _service.getPatientReports();
     } catch (e) {
       error ??= e.toString();
@@ -184,6 +287,18 @@ class RoleDashboardController extends ChangeNotifier {
     } finally {
       isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<PrescriptionDetail?> loadPatientPrescriptionDetails(
+    int prescriptionId,
+  ) async {
+    try {
+      return await _service.getPatientPrescriptionDetail(prescriptionId);
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      return null;
     }
   }
 
@@ -524,5 +639,11 @@ class RoleDashboardController extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    stopNotificationRealtimeSync();
+    super.dispose();
   }
 }

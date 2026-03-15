@@ -528,19 +528,56 @@ class PatientEndpoint extends Endpoint {
   ) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
-      final rawUrl = profileImageUrl?.trim();
-      final normalizedImageUrl = (rawUrl != null &&
-              (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')))
-          ? rawUrl
-          : null;
+      final rawImageInput = profileImageUrl?.trim();
+      String? normalizeRemoteUrl(String? value) {
+        final raw = value?.trim();
+        if (raw == null || raw.isEmpty) return null;
+
+        final parsed = Uri.tryParse(raw);
+        if (parsed != null &&
+            (parsed.scheme == 'http' || parsed.scheme == 'https') &&
+            parsed.host.isNotEmpty) {
+          return raw;
+        }
+
+        // Accept protocol-relative URLs like //res.cloudinary.com/...
+        if (raw.startsWith('//')) {
+          return 'https:$raw';
+        }
+
+        // Accept bare host URLs and normalize to https.
+        if (parsed != null &&
+            parsed.scheme.isEmpty &&
+            parsed.host.isEmpty &&
+            raw.contains('.')) {
+          return 'https://$raw';
+        }
+
+        return null;
+      }
+
+      final normalizedImageUrl = normalizeRemoteUrl(profileImageUrl);
+
+      if (rawImageInput != null &&
+          rawImageInput.isNotEmpty &&
+          normalizedImageUrl == null) {
+        session.log(
+          'updatePatientProfile: rejected invalid profile image URL for user_id=$resolvedUserId value="$rawImageInput"',
+          level: LogLevel.warning,
+        );
+        return 'Invalid profile image URL';
+      }
 
       return await session.db.transaction((transaction) async {
-        await session.db.unsafeExecute(
+        final updatedUsers = await session.db.unsafeExecute(
           '''
         UPDATE users
         SET name = @name,
             phone = @phone,
-            profile_picture_url = COALESCE(@url, profile_picture_url)
+            profile_picture_url = CASE
+              WHEN @url IS NULL THEN profile_picture_url
+              ELSE @url
+            END
         WHERE user_id = @id
         ''',
           parameters: QueryParameters.named({
@@ -550,6 +587,47 @@ class PatientEndpoint extends Endpoint {
             'url': normalizedImageUrl,
           }),
         );
+
+        if (updatedUsers <= 0) {
+          session.log(
+            'updatePatientProfile: no users row updated for user_id=$resolvedUserId',
+            level: LogLevel.warning,
+          );
+          return 'Failed to update profile';
+        }
+
+        if (normalizedImageUrl != null) {
+          final verifyRows = await session.db.unsafeQuery(
+            '''
+            SELECT profile_picture_url
+            FROM users
+            WHERE user_id = @id
+            LIMIT 1
+            ''',
+            parameters: QueryParameters.named({'id': resolvedUserId}),
+          );
+
+          if (verifyRows.isEmpty) {
+            session.log(
+              'updatePatientProfile: verification read returned no row for user_id=$resolvedUserId',
+              level: LogLevel.warning,
+            );
+            return 'Failed to verify profile update';
+          }
+
+          final savedUrl = verifyRows.first
+              .toColumnMap()['profile_picture_url']
+              ?.toString()
+              .trim();
+
+          if (savedUrl == null || savedUrl != normalizedImageUrl) {
+            session.log(
+              'updatePatientProfile: profile_picture_url mismatch for user_id=$resolvedUserId expected="$normalizedImageUrl" actual="$savedUrl"',
+              level: LogLevel.warning,
+            );
+            return 'Failed to persist profile picture URL';
+          }
+        }
 
         await session.db.unsafeExecute(
           '''
@@ -579,7 +657,7 @@ class PatientEndpoint extends Endpoint {
         level: LogLevel.error,
         stackTrace: stack,
       );
-      return 'Failed to update profile';
+      return 'Failed to update profile: $e';
     }
   }
 
@@ -710,6 +788,24 @@ class PatientEndpoint extends Endpoint {
           'id': resultId,
           'method': method,
           'txn': txn,
+        }),
+      );
+
+      await session.db.unsafeExecute(
+        '''
+        INSERT INTO notifications (user_id, title, message, is_read, created_at)
+        VALUES (
+          @uid,
+          'Payment Updated',
+          @message,
+          FALSE,
+          NOW()
+        )
+        ''',
+        parameters: QueryParameters.named({
+          'uid': resolvedUserId,
+          'message':
+              'Payment completed for lab result #$resultId via $method. Transaction is being processed.',
         }),
       );
 

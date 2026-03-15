@@ -278,6 +278,43 @@ class LabEndpoint extends Endpoint {
     }
   }
 
+  Future<void> _notifyUserByMobile(
+    Session session, {
+    required String mobileNumber,
+    required String title,
+    required String message,
+  }) async {
+    final normalizedMobile = mobileNumber.trim();
+    if (normalizedMobile.isEmpty) return;
+
+    final userRows = await session.db.unsafeQuery(
+      '''
+      SELECT user_id
+      FROM users
+      WHERE phone = @mobile
+      LIMIT 1
+      ''',
+      parameters: QueryParameters.named({'mobile': normalizedMobile}),
+    );
+
+    if (userRows.isEmpty) return;
+
+    final userId = userRows.first.toColumnMap()['user_id'] as int?;
+    if (userId == null) return;
+
+    await session.db.unsafeExecute(
+      '''
+      INSERT INTO notifications (user_id, title, message, is_read, created_at)
+      VALUES (@uid, @title, @message, FALSE, NOW())
+      ''',
+      parameters: QueryParameters.named({
+        'uid': userId,
+        'title': title,
+        'message': message,
+      }),
+    );
+  }
+
   Future<LabPaymentItem?> _getPaymentItemById(
       Session session, int resultId) async {
     await _ensurePaymentColumns(session);
@@ -632,7 +669,17 @@ class LabEndpoint extends Endpoint {
         ''',
         parameters: QueryParameters.named({'id': resultId, 'txn': txn}),
       );
-      return await _getPaymentItemById(session, resultId);
+      final item = await _getPaymentItemById(session, resultId);
+      if (item != null) {
+        await _notifyUserByMobile(
+          session,
+          mobileNumber: item.mobileNumber,
+          title: 'Payment Updated',
+          message:
+              'Your lab payment is marked as PAID for ${item.testName}. Transaction: ${item.transactionId ?? 'N/A'}',
+        );
+      }
+      return item;
     } catch (e, st) {
       session.log('Collect cash payment failed: $e',
           level: LogLevel.error, stackTrace: st);
@@ -738,6 +785,14 @@ class LabEndpoint extends Endpoint {
         final message =
             'প্রিয় $name, আপনার lab result submit হয়েছে।\nডাউনলোড লিংক: $url';
         await sendDummySms(session, mobileNumber: mobile, message: message);
+
+        await _notifyUserByMobile(
+          session,
+          mobileNumber: mobile,
+          title: 'Test Report Updated',
+          message:
+              'Your test report is now available. You can view/download it from your reports section.',
+        );
       }
 
       return true;
