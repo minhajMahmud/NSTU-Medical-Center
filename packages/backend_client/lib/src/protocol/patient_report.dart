@@ -19,6 +19,8 @@ abstract class PatientReportDto implements _i1.SerializableModel {
     required this.date,
     required this.isUploaded,
     this.fileUrl,
+    this.doctorNotes,
+    this.reviewAction,
   });
 
   factory PatientReportDto({
@@ -27,6 +29,8 @@ abstract class PatientReportDto implements _i1.SerializableModel {
     required DateTime date,
     required bool isUploaded,
     String? fileUrl,
+    String? doctorNotes,
+    String? reviewAction,
   }) = _PatientReportDtoImpl;
 
   factory PatientReportDto.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -36,6 +40,8 @@ abstract class PatientReportDto implements _i1.SerializableModel {
       date: _i1.DateTimeJsonExtension.fromJson(jsonSerialization['date']),
       isUploaded: jsonSerialization['isUploaded'] as bool,
       fileUrl: jsonSerialization['fileUrl'] as String?,
+      doctorNotes: jsonSerialization['doctorNotes'] as String?,
+      reviewAction: jsonSerialization['reviewAction'] as String?,
     );
   }
 
@@ -49,6 +55,10 @@ abstract class PatientReportDto implements _i1.SerializableModel {
 
   String? fileUrl;
 
+  String? doctorNotes;
+
+  String? reviewAction;
+
   /// Returns a shallow copy of this [PatientReportDto]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -58,6 +68,8 @@ abstract class PatientReportDto implements _i1.SerializableModel {
     DateTime? date,
     bool? isUploaded,
     String? fileUrl,
+    String? doctorNotes,
+    String? reviewAction,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -68,6 +80,8 @@ abstract class PatientReportDto implements _i1.SerializableModel {
       'date': date.toJson(),
       'isUploaded': isUploaded,
       if (fileUrl != null) 'fileUrl': fileUrl,
+      if (doctorNotes != null) 'doctorNotes': doctorNotes,
+      if (reviewAction != null) 'reviewAction': reviewAction,
     };
   }
 
@@ -86,12 +100,16 @@ class _PatientReportDtoImpl extends PatientReportDto {
     required DateTime date,
     required bool isUploaded,
     String? fileUrl,
+    String? doctorNotes,
+    String? reviewAction,
   }) : super._(
          id: id,
          testName: testName,
          date: date,
          isUploaded: isUploaded,
          fileUrl: fileUrl,
+         doctorNotes: doctorNotes,
+         reviewAction: reviewAction,
        );
 
   /// Returns a shallow copy of this [PatientReportDto]
@@ -104,6 +122,8 @@ class _PatientReportDtoImpl extends PatientReportDto {
     DateTime? date,
     bool? isUploaded,
     Object? fileUrl = _Undefined,
+    Object? doctorNotes = _Undefined,
+    Object? reviewAction = _Undefined,
   }) {
     return PatientReportDto(
       id: id ?? this.id,
@@ -111,6 +131,8 @@ class _PatientReportDtoImpl extends PatientReportDto {
       date: date ?? this.date,
       isUploaded: isUploaded ?? this.isUploaded,
       fileUrl: fileUrl is String? ? fileUrl : this.fileUrl,
+      doctorNotes: doctorNotes is String? ? doctorNotes : this.doctorNotes,
+      reviewAction: reviewAction is String? ? reviewAction : this.reviewAction,
     );
   }
 }

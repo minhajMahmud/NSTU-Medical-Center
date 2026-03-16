@@ -1,4 +1,4 @@
-import 'package:backend_client/backend_client.dart';
+﻿import 'package:backend_client/backend_client.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -20,8 +20,36 @@ class AppTopNavigationBar extends StatefulWidget
 }
 
 class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
+  bool _expandToday = true;
+  bool _expandEarlier = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      if (!mounted) return;
+      context.read<RoleDashboardController>().startNotificationRealtimeSync();
+    });
+  }
+
+  String _displayMessage(String message) {
+    return message
+        .replaceAll(RegExp(r'\s*\[route:[^\]]+\]', caseSensitive: false), '')
+        .trim();
+  }
+
+  String _targetRoute(BuildContext context, String title, String message) {
+    final routeToken = RegExp(
+      r'\[route:([^\]]+)\]',
+      caseSensitive: false,
+    ).firstMatch(message)?.group(1)?.trim();
+    if (routeToken != null && routeToken.startsWith('/')) return routeToken;
+    final currentPath = GoRouterState.of(context).uri.path;
+    if (currentPath.startsWith('/doctor')) return '/doctor/reports';
+    return '/patient/reports';
+  }
+
   ({IconData icon, Color color, String type}) _notificationStyle(
-    BuildContext context,
     String title,
     String message,
   ) {
@@ -43,41 +71,22 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
     if (text.contains('prescription') || text.contains('medicine')) {
       return (
         icon: Icons.description_rounded,
-        color: Colors.blue,
+        color: Colors.orange,
         type: 'Prescription',
       );
     }
+    if (text.contains('appointment')) {
+      return (
+        icon: Icons.calendar_today_rounded,
+        color: Colors.blue,
+        type: 'Appointment',
+      );
+    }
     return (
-      icon: Icons.notifications_active,
-      color: Theme.of(context).colorScheme.primary,
-      type: 'Update',
+      icon: Icons.notifications_rounded,
+      color: Colors.blueGrey,
+      type: 'Notification',
     );
-  }
-
-  String _targetRoute(String title, String message) {
-    final text = '${title.toLowerCase()} ${message.toLowerCase()}';
-    if (text.contains('payment') || text.contains('paid')) {
-      return '/patient/payments';
-    }
-    if (text.contains('report') || text.contains('lab result')) {
-      return '/patient/reports';
-    }
-    if (text.contains('prescription') || text.contains('medicine')) {
-      return '/patient/reports';
-    }
-    return '/patient/notifications';
-  }
-
-  String _timeAgo(DateTime dateTime) {
-    final now = DateTime.now();
-    final diff = now.difference(dateTime);
-
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays == 1) return '1d ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return DateFormat('dd MMM').format(dateTime);
   }
 
   bool _isToday(DateTime dt) {
@@ -85,32 +94,71 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
     return dt.year == now.year && dt.month == now.month && dt.day == now.day;
   }
 
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return DateFormat('MMM d').format(dt);
+  }
+
   Widget _buildNotificationTile(
     BuildContext context,
     RoleDashboardController ctrl,
     NotificationInfo n,
   ) {
-    final style = _notificationStyle(context, n.title, n.message);
+    final style = _notificationStyle(n.title, n.message);
+    final cleanMessage = _displayMessage(n.message);
     return ListTile(
+      dense: true,
+      tileColor: n.isRead
+          ? null
+          : Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withValues(alpha: 0.18),
       leading: CircleAvatar(
-        backgroundColor: style.color.withValues(alpha: n.isRead ? 0.12 : 0.18),
-        child: Icon(
-          n.isRead ? Icons.notifications_none : style.icon,
-          color: n.isRead ? Colors.grey : style.color,
-          size: 20,
-        ),
+        backgroundColor: style.color.withValues(alpha: 0.15),
+        child: Icon(style.icon, color: style.color, size: 20),
       ),
-      title: Text(
-        n.title,
-        style: TextStyle(
-          fontWeight: n.isRead ? FontWeight.w500 : FontWeight.w700,
-        ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              n.title,
+              style: TextStyle(
+                fontWeight: n.isRead ? FontWeight.w500 : FontWeight.w700,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (!n.isRead)
+            Container(
+              margin: const EdgeInsets.only(left: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text(
+                'NEW',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ),
+        ],
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 2),
-          Text(n.message),
+          Text(cleanMessage),
           const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -129,29 +177,19 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
           ),
         ],
       ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            _timeAgo(n.createdAt),
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            DateFormat('hh:mm a').format(n.createdAt),
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
+      trailing: Text(
+        _timeAgo(n.createdAt),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
       ),
+      isThreeLine: true,
       onTap: () async {
         if (!n.isRead) {
           await ctrl.markNotificationAsRead(n.notificationId);
         }
         if (!context.mounted) return;
-        final route = _targetRoute(n.title, n.message);
+        final route = _targetRoute(context, n.title, n.message);
         Navigator.of(context).pop();
         if (!mounted) return;
         this.context.go(route);
@@ -159,135 +197,185 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    Future.microtask(() {
-      if (!mounted) return;
-      context.read<RoleDashboardController>().startNotificationRealtimeSync();
-    });
-  }
-
   Future<void> _openNotificationsPanel(BuildContext context) async {
     final c = context.read<RoleDashboardController>();
     await c.refreshNotifications(silent: true);
     if (!context.mounted) return;
 
-    await showModalBottomSheet<void>(
+    await showGeneralDialog<void>(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: SizedBox(
-            height: MediaQuery.of(sheetContext).size.height * 0.65,
-            child: Consumer<RoleDashboardController>(
-              builder: (_, ctrl, __) {
-                final items = ctrl.patientNotifications;
-                final todayItems = items
-                    .where((n) => _isToday(n.createdAt))
-                    .toList();
-                final earlierItems = items
-                    .where((n) => !_isToday(n.createdAt))
-                    .toList();
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Notifications',
-                            style: Theme.of(sheetContext).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w700),
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss notifications',
+      barrierColor: Colors.black26,
+      transitionDuration: const Duration(milliseconds: 260),
+      transitionBuilder: (ctx, anim, _, child) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(1.0, 0.0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+          child: child,
+        );
+      },
+      pageBuilder: (ctx, _, __) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Material(
+            elevation: 8,
+            child: SizedBox(
+              width: 380,
+              height: double.infinity,
+              child: SafeArea(
+                child: Consumer<RoleDashboardController>(
+                  builder: (_, ctrl, __) {
+                    final sorted = [...ctrl.patientNotifications]
+                      ..sort((a, b) {
+                        final unreadPriority = (a.isRead ? 1 : 0).compareTo(
+                          b.isRead ? 1 : 0,
+                        );
+                        if (unreadPriority != 0) return unreadPriority;
+                        return b.createdAt.compareTo(a.createdAt);
+                      });
+
+                    final todayItems = sorted
+                        .where((n) => _isToday(n.createdAt))
+                        .toList();
+                    final earlierItems = sorted
+                        .where((n) => !_isToday(n.createdAt))
+                        .toList();
+
+                    return Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+                          child: Row(
+                            children: [
+                              Text(
+                                'Notifications',
+                                style: Theme.of(ctx).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const Spacer(),
+                              TextButton.icon(
+                                onPressed: sorted.isEmpty
+                                    ? null
+                                    : () => ctrl.markAllNotificationsAsRead(),
+                                icon: const Icon(Icons.done_all, size: 18),
+                                label: const Text('Mark all read'),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                tooltip: 'Close',
+                                onPressed: () => Navigator.of(ctx).pop(),
+                              ),
+                            ],
                           ),
-                          const Spacer(),
-                          TextButton.icon(
-                            onPressed: items.isEmpty
-                                ? null
-                                : () => ctrl.markAllNotificationsAsRead(),
-                            icon: const Icon(Icons.done_all, size: 18),
-                            label: const Text('Mark all read'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    Expanded(
-                      child: items.isEmpty
-                          ? const Center(child: Text('No notifications yet.'))
-                          : ListView(
-                              children: [
-                                if (todayItems.isNotEmpty) ...[
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      12,
-                                      16,
-                                      6,
-                                    ),
-                                    child: Text(
-                                      'Today',
-                                      style: Theme.of(sheetContext)
-                                          .textTheme
-                                          .titleSmall
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                    ),
-                                  ),
-                                  ...todayItems.map(
-                                    (n) => Column(
-                                      children: [
-                                        _buildNotificationTile(
-                                          sheetContext,
-                                          ctrl,
-                                          n,
+                        ),
+                        const Divider(height: 1),
+                        Expanded(
+                          child: sorted.isEmpty
+                              ? const Center(
+                                  child: Text('No notifications yet.'),
+                                )
+                              : ListView(
+                                  children: [
+                                    if (todayItems.isNotEmpty) ...[
+                                      ListTile(
+                                        dense: true,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                            ),
+                                        title: Text(
+                                          'Today',
+                                          style: Theme.of(ctx)
+                                              .textTheme
+                                              .titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                              ),
                                         ),
-                                        const Divider(height: 1),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                if (earlierItems.isNotEmpty) ...[
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      12,
-                                      16,
-                                      6,
-                                    ),
-                                    child: Text(
-                                      'Earlier',
-                                      style: Theme.of(sheetContext)
-                                          .textTheme
-                                          .titleSmall
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w700,
+                                        trailing: IconButton(
+                                          tooltip: _expandToday
+                                              ? 'Collapse today'
+                                              : 'Expand today',
+                                          onPressed: () => setState(
+                                            () => _expandToday = !_expandToday,
                                           ),
-                                    ),
-                                  ),
-                                  ...earlierItems.map(
-                                    (n) => Column(
-                                      children: [
-                                        _buildNotificationTile(
-                                          sheetContext,
-                                          ctrl,
-                                          n,
+                                          icon: Icon(
+                                            _expandToday
+                                                ? Icons.expand_less
+                                                : Icons.expand_more,
+                                          ),
                                         ),
-                                        const Divider(height: 1),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                    ),
-                  ],
-                );
-              },
+                                      ),
+                                      if (_expandToday)
+                                        ...todayItems.map(
+                                          (n) => Column(
+                                            children: [
+                                              _buildNotificationTile(
+                                                ctx,
+                                                ctrl,
+                                                n,
+                                              ),
+                                              const Divider(height: 1),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                    if (earlierItems.isNotEmpty) ...[
+                                      ListTile(
+                                        dense: true,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                            ),
+                                        title: Text(
+                                          'Earlier',
+                                          style: Theme.of(ctx)
+                                              .textTheme
+                                              .titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
+                                        trailing: IconButton(
+                                          tooltip: _expandEarlier
+                                              ? 'Collapse earlier'
+                                              : 'Expand earlier',
+                                          onPressed: () => setState(
+                                            () => _expandEarlier =
+                                                !_expandEarlier,
+                                          ),
+                                          icon: Icon(
+                                            _expandEarlier
+                                                ? Icons.expand_less
+                                                : Icons.expand_more,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_expandEarlier)
+                                        ...earlierItems.map(
+                                          (n) => Column(
+                                            children: [
+                                              _buildNotificationTile(
+                                                ctx,
+                                                ctrl,
+                                                n,
+                                              ),
+                                              const Divider(height: 1),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ],
+                                ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         );
@@ -317,7 +405,16 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
           icon: Stack(
             clipBehavior: Clip.none,
             children: [
-              const Icon(Icons.notifications_outlined),
+              TweenAnimationBuilder<double>(
+                key: ValueKey<int>(unread),
+                tween: Tween<double>(begin: 1.22, end: 1.0),
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutBack,
+                child: const Icon(Icons.notifications_outlined),
+                builder: (context, scale, child) {
+                  return Transform.scale(scale: scale, child: child);
+                },
+              ),
               if (unread > 0)
                 Positioned(
                   right: -4,

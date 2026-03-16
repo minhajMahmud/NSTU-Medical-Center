@@ -340,7 +340,35 @@ class PatientEndpoint extends Endpoint {
       );
 
       if (result.isEmpty) return -1;
-      return result.first.toColumnMap()['request_id'] as int;
+      final requestId = result.first.toColumnMap()['request_id'] as int;
+
+      try {
+        await session.db.unsafeExecute(
+          '''
+          INSERT INTO notifications (user_id, title, message, is_read, created_at)
+          VALUES (
+            @doctorId,
+            'New Appointment Request',
+            @message,
+            FALSE,
+            NOW()
+          )
+          ''',
+          parameters: QueryParameters.named({
+            'doctorId': doctorId,
+            'message':
+                'A patient requested an appointment on ${appointmentDate.toIso8601String().split('T').first} at $normalizedTime. Request ID: $requestId',
+          }),
+        );
+      } catch (notifyError, notifyStack) {
+        session.log(
+          'createAppointmentRequest notification failed: $notifyError',
+          level: LogLevel.warning,
+          stackTrace: notifyStack,
+        );
+      }
+
+      return requestId;
     } catch (e, stack) {
       session.log(
         'createAppointmentRequest failed: $e',
@@ -669,19 +697,37 @@ class PatientEndpoint extends Endpoint {
       final resolvedUserId = requireAuthenticatedUserId(session);
       final result = await session.db.unsafeQuery(
         '''
-      SELECT 
-        tr.result_id,
-        lt.test_name,
-        tr.created_at,
-        tr.is_uploaded,
-        tr.attachment_path
-      FROM users u
-      JOIN test_results tr 
-        ON tr.mobile_number = u.phone
-      JOIN lab_tests lt 
-        ON lt.test_id = tr.test_id
-      WHERE u.user_id = @userId
-      ORDER BY tr.created_at DESC
+      SELECT * FROM (
+        SELECT 
+          tr.result_id::int AS result_id,
+          COALESCE(lt.test_name, 'Lab Test')::text AS test_name,
+          COALESCE(tr.created_at, NOW()) AS created_at,
+          COALESCE(tr.is_uploaded, FALSE) AS is_uploaded,
+          tr.attachment_path::text AS attachment_path,
+          NULL::text AS doctor_notes,
+          NULL::text AS review_action
+        FROM users u
+        JOIN test_results tr 
+          ON tr.mobile_number = u.phone
+        LEFT JOIN lab_tests lt 
+          ON lt.test_id = tr.test_id
+        WHERE u.user_id = @userId
+
+        UNION ALL
+
+        SELECT
+          (1000000 + r.report_id)::int AS result_id,
+          COALESCE(NULLIF(r.type, ''), 'Reviewed Lab Report')::text AS test_name,
+          COALESCE(r.created_at, r.report_date::timestamp, NOW()) AS created_at,
+          (r.reviewed = TRUE AND COALESCE(r.file_path, '') <> '') AS is_uploaded,
+          r.file_path::text AS attachment_path,
+          CASE WHEN r.visible_to_patient = TRUE THEN r.doctor_notes ELSE NULL END AS doctor_notes,
+          CASE WHEN r.visible_to_patient = TRUE THEN r.review_action ELSE NULL END AS review_action
+        FROM "UploadpatientR" r
+        WHERE r.patient_id = @userId
+          AND r.reviewed = TRUE
+      ) mixed_reports
+      ORDER BY created_at DESC, result_id DESC
       ''',
         parameters: QueryParameters.named({'userId': resolvedUserId}),
       );
@@ -694,6 +740,8 @@ class PatientEndpoint extends Endpoint {
           date: row['created_at'] as DateTime,
           isUploaded: _toBool(row['is_uploaded']),
           fileUrl: _safeString(row['attachment_path']),
+          doctorNotes: row['doctor_notes'] as String?,
+          reviewAction: row['review_action'] as String?,
         );
       }).toList();
     } catch (e, stack) {
@@ -919,10 +967,33 @@ class PatientEndpoint extends Endpoint {
   }) async {
     try {
       final int resolvedPatientId = requireAuthenticatedUserId(session);
+      final normalizedType =
+          reportType.trim().isEmpty ? 'Lab Report' : reportType.trim();
 
       final secureUrl = fileUrl.trim();
       if (!(secureUrl.startsWith('http://') ||
           secureUrl.startsWith('https://'))) {
+        return false;
+      }
+
+      // Validate prescription ownership and resolve assigned doctor.
+      final prescriptionRows = await session.db.unsafeQuery(
+        '''
+        SELECT patient_id, doctor_id
+        FROM prescriptions
+        WHERE prescription_id = @pId
+        LIMIT 1
+        ''',
+        parameters: QueryParameters.named({'pId': prescriptionId}),
+      );
+
+      if (prescriptionRows.isEmpty) return false;
+      final prescriptionMap = prescriptionRows.first.toColumnMap();
+      final prescriptionPatientId = prescriptionMap['patient_id'] as int?;
+      final doctorId = prescriptionMap['doctor_id'] as int?;
+      if (prescriptionPatientId == null ||
+          doctorId == null ||
+          prescriptionPatientId != resolvedPatientId) {
         return false;
       }
 
@@ -941,45 +1012,80 @@ class PatientEndpoint extends Endpoint {
         final DateTime createdAt = row['created_at'];
         if (DateTime.now().difference(createdAt).inHours < 12) {
           // ১২ ঘণ্টার কম হলে আপডেট করুন
-          await session.db.unsafeExecute(
-            'UPDATE "UploadpatientR" SET file_path = @path, type = @type WHERE report_id = @report_id ',
+          final updated = await session.db.unsafeExecute(
+            '''
+            UPDATE "UploadpatientR"
+            SET
+              file_path = @path,
+              type = @type,
+              report_date = CURRENT_DATE,
+              prescribed_doctor_id = @docId,
+              uploaded_by = @uploadedBy,
+              reviewed = FALSE
+            WHERE report_id = @report_id
+            ''',
             parameters: QueryParameters.named({
               'report_id': existing.first.toColumnMap()['report_id'],
               'path': secureUrl,
-              'type': reportType,
+              'type': normalizedType,
+              'docId': doctorId,
+              'uploadedBy': resolvedPatientId,
             }),
           );
+
+          if (updated <= 0) return false;
+
+          await session.db.unsafeExecute('''
+            INSERT INTO notifications (user_id, title, message, is_read, created_at)
+            VALUES (@docId, 'Lab Report Updated', @message, false, NOW())
+          ''',
+              parameters: QueryParameters.named({
+                'docId': doctorId,
+                'message':
+                    'A patient updated a ${normalizedType.toLowerCase()} for Prescription ID: $prescriptionId.',
+              }));
+
           return true;
         }
       }
 
-      // প্রেসক্রিপশন থেকে ডাক্তার আইডি বের করা (নতুন আপলোডের জন্য)
-      final docResult = await session.db.unsafeQuery(
-        'SELECT doctor_id FROM prescriptions WHERE prescription_id = @pId',
-        parameters: QueryParameters.named({'pId': prescriptionId}),
+      final patientNameRows = await session.db.unsafeQuery(
+        'SELECT name FROM users WHERE user_id = @uid LIMIT 1',
+        parameters: QueryParameters.named({'uid': resolvedPatientId}),
       );
-      if (docResult.isEmpty) return false;
-      int doctorId = docResult.first.toColumnMap()['doctor_id'];
+      final patientName = patientNameRows.isEmpty
+          ? 'Patient #$resolvedPatientId'
+          : _safeString(patientNameRows.first.toColumnMap()['name']);
 
       // ডাটাবেসে নতুন রিপোর্ট সেভ
-      await session.db.unsafeExecute('''
+      final insertRows = await session.db.unsafeQuery('''
         INSERT INTO "UploadpatientR"
         (patient_id, type, report_date, file_path, prescribed_doctor_id, prescription_id, uploaded_by, created_at)
         VALUES (@pId, @type, CURRENT_DATE, @path, @docId, @refId, @pId, NOW())
+        RETURNING report_id
       ''',
           parameters: QueryParameters.named({
             'pId': resolvedPatientId,
-            'type': reportType,
+            'type': normalizedType,
             'path': secureUrl,
             'docId': doctorId,
             'refId': prescriptionId,
           }));
 
+      final insertedReportId = insertRows.isEmpty
+          ? null
+          : insertRows.first.toColumnMap()['report_id'] as int?;
+
       // ডাক্তারকে নোটিফিকেশন
       await session.db.unsafeExecute('''
         INSERT INTO notifications (user_id, title, message, is_read, created_at)
-        VALUES (@docId, 'New Report', 'Patient uploaded a $reportType report.', false, NOW())
-      ''', parameters: QueryParameters.named({'docId': doctorId}));
+        VALUES (@docId, 'New Lab Report Received', @message, false, NOW())
+      ''',
+          parameters: QueryParameters.named({
+            'docId': doctorId,
+            'message':
+                '$patientName uploaded a ${normalizedType.toLowerCase()} report.${insertedReportId == null ? '' : ' Report ID: $insertedReportId.'} Prescription ID: $prescriptionId.',
+          }));
 
       return true;
     } catch (e, stackTrace) {

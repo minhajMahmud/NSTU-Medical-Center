@@ -71,6 +71,7 @@ doctor:
   - createPrescription:
   - getReportsForDoctor:
   - markReportReviewed:
+  - submitDoctorReview:
   - revisePrescription:
   - getPatientPrescriptionList:
   - getAppointmentRequests:

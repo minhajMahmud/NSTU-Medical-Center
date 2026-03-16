@@ -991,6 +991,23 @@ class EndpointDoctor extends _i1.EndpointRef {
         {'reportId': reportId},
       );
 
+  /// Submit a full doctor review: clinical notes, action, patient portal visibility.
+  _i2.Future<bool> submitDoctorReview(
+    int reportId,
+    String notes,
+    String action,
+    bool visibleToPatient,
+  ) => caller.callServerEndpoint<bool>(
+    'doctor',
+    'submitDoctorReview',
+    {
+      'reportId': reportId,
+      'notes': notes,
+      'action': action,
+      'visibleToPatient': visibleToPatient,
+    },
+  );
+
   _i2.Future<int> revisePrescription({
     required int originalPrescriptionId,
     required String newAdvice,

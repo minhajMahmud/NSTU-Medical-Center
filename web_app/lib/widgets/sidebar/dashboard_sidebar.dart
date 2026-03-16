@@ -124,12 +124,6 @@ class DashboardSidebar extends StatelessWidget {
             icon: Icons.local_hospital_outlined,
             selectedIcon: Icons.local_hospital,
           ),
-          _NavItem(
-            route: '/patient/notifications',
-            label: 'Notifications',
-            icon: Icons.notifications_outlined,
-            selectedIcon: Icons.notifications,
-          ),
         ];
       case AppRole.doctor:
         return const [

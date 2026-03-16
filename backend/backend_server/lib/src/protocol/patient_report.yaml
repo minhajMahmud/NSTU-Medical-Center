@@ -5,3 +5,5 @@ fields:
   date: DateTime
   isUploaded: bool
   fileUrl: String?
+  doctorNotes: String?
+  reviewAction: String?

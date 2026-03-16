@@ -32,7 +32,6 @@ import '../../pages/login/login_page.dart';
 import '../../pages/login/forgot_password_page.dart';
 import '../../pages/login/register_page.dart';
 import '../../pages/patient/patient_lab_tests_page.dart';
-import '../../pages/patient/patient_notifications_page.dart';
 import '../../pages/patient/patient_payments_page.dart';
 import '../../pages/patient/patient_profile_page.dart';
 import '../../pages/patient/patient_staff_info_page.dart';
@@ -129,10 +128,6 @@ GoRouter createAppRouter(AuthController auth) {
       GoRoute(
         path: '/patient/staff',
         builder: (_, __) => const PatientStaffInfoPage(),
-      ),
-      GoRoute(
-        path: '/patient/notifications',
-        builder: (_, __) => const PatientNotificationsPage(),
       ),
 
       GoRoute(

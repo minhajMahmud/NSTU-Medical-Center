@@ -24,7 +24,12 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
     required this.uploadedBy,
     required this.reviewed,
     this.createdAt,
-  });
+    this.doctorNotes,
+    bool? visibleToPatient,
+    this.reviewAction,
+    this.reviewedAt,
+    this.reviewedBy,
+  }) : visibleToPatient = visibleToPatient ?? false;
 
   factory PatientExternalReport({
     int? reportId,
@@ -37,6 +42,11 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
     required int uploadedBy,
     required bool reviewed,
     DateTime? createdAt,
+    String? doctorNotes,
+    bool? visibleToPatient,
+    String? reviewAction,
+    DateTime? reviewedAt,
+    int? reviewedBy,
   }) = _PatientExternalReportImpl;
 
   factory PatientExternalReport.fromJson(
@@ -57,6 +67,13 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
       createdAt: jsonSerialization['createdAt'] == null
           ? null
           : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['createdAt']),
+      doctorNotes: jsonSerialization['doctorNotes'] as String?,
+      visibleToPatient: jsonSerialization['visibleToPatient'] as bool,
+      reviewAction: jsonSerialization['reviewAction'] as String?,
+      reviewedAt: jsonSerialization['reviewedAt'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['reviewedAt']),
+      reviewedBy: jsonSerialization['reviewedBy'] as int?,
     );
   }
 
@@ -80,6 +97,16 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
 
   DateTime? createdAt;
 
+  String? doctorNotes;
+
+  bool visibleToPatient;
+
+  String? reviewAction;
+
+  DateTime? reviewedAt;
+
+  int? reviewedBy;
+
   /// Returns a shallow copy of this [PatientExternalReport]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -94,6 +121,11 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
     int? uploadedBy,
     bool? reviewed,
     DateTime? createdAt,
+    String? doctorNotes,
+    bool? visibleToPatient,
+    String? reviewAction,
+    DateTime? reviewedAt,
+    int? reviewedBy,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -109,6 +141,11 @@ abstract class PatientExternalReport implements _i1.SerializableModel {
       'uploadedBy': uploadedBy,
       'reviewed': reviewed,
       if (createdAt != null) 'createdAt': createdAt?.toJson(),
+      if (doctorNotes != null) 'doctorNotes': doctorNotes,
+      'visibleToPatient': visibleToPatient,
+      if (reviewAction != null) 'reviewAction': reviewAction,
+      if (reviewedAt != null) 'reviewedAt': reviewedAt?.toJson(),
+      if (reviewedBy != null) 'reviewedBy': reviewedBy,
     };
   }
 
@@ -132,6 +169,11 @@ class _PatientExternalReportImpl extends PatientExternalReport {
     required int uploadedBy,
     required bool reviewed,
     DateTime? createdAt,
+    String? doctorNotes,
+    bool? visibleToPatient,
+    String? reviewAction,
+    DateTime? reviewedAt,
+    int? reviewedBy,
   }) : super._(
          reportId: reportId,
          patientId: patientId,
@@ -143,6 +185,11 @@ class _PatientExternalReportImpl extends PatientExternalReport {
          uploadedBy: uploadedBy,
          reviewed: reviewed,
          createdAt: createdAt,
+         doctorNotes: doctorNotes,
+         visibleToPatient: visibleToPatient,
+         reviewAction: reviewAction,
+         reviewedAt: reviewedAt,
+         reviewedBy: reviewedBy,
        );
 
   /// Returns a shallow copy of this [PatientExternalReport]
@@ -160,6 +207,11 @@ class _PatientExternalReportImpl extends PatientExternalReport {
     int? uploadedBy,
     bool? reviewed,
     Object? createdAt = _Undefined,
+    Object? doctorNotes = _Undefined,
+    bool? visibleToPatient,
+    Object? reviewAction = _Undefined,
+    Object? reviewedAt = _Undefined,
+    Object? reviewedBy = _Undefined,
   }) {
     return PatientExternalReport(
       reportId: reportId is int? ? reportId : this.reportId,
@@ -174,6 +226,11 @@ class _PatientExternalReportImpl extends PatientExternalReport {
       uploadedBy: uploadedBy ?? this.uploadedBy,
       reviewed: reviewed ?? this.reviewed,
       createdAt: createdAt is DateTime? ? createdAt : this.createdAt,
+      doctorNotes: doctorNotes is String? ? doctorNotes : this.doctorNotes,
+      visibleToPatient: visibleToPatient ?? this.visibleToPatient,
+      reviewAction: reviewAction is String? ? reviewAction : this.reviewAction,
+      reviewedAt: reviewedAt is DateTime? ? reviewedAt : this.reviewedAt,
+      reviewedBy: reviewedBy is int? ? reviewedBy : this.reviewedBy,
     );
   }
 }

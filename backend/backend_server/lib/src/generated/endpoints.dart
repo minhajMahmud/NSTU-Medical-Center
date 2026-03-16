@@ -1960,6 +1960,43 @@ class Endpoints extends _i1.EndpointDispatch {
                     params['reportId'],
                   ),
         ),
+        'submitDoctorReview': _i1.MethodConnector(
+          name: 'submitDoctorReview',
+          params: {
+            'reportId': _i1.ParameterDescription(
+              name: 'reportId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'notes': _i1.ParameterDescription(
+              name: 'notes',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'action': _i1.ParameterDescription(
+              name: 'action',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'visibleToPatient': _i1.ParameterDescription(
+              name: 'visibleToPatient',
+              type: _i1.getType<bool>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['doctor'] as _i7.DoctorEndpoint)
+                  .submitDoctorReview(
+                    session,
+                    params['reportId'],
+                    params['notes'],
+                    params['action'],
+                    params['visibleToPatient'],
+                  ),
+        ),
         'revisePrescription': _i1.MethodConnector(
           name: 'revisePrescription',
           params: {

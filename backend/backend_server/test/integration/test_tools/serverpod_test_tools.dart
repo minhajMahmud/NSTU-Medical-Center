@@ -2674,6 +2674,45 @@ class _DoctorEndpoint {
     });
   }
 
+  _i3.Future<bool> submitDoctorReview(
+    _i1.TestSessionBuilder sessionBuilder,
+    int reportId,
+    String notes,
+    String action,
+    bool visibleToPatient,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'doctor',
+            method: 'submitDoctorReview',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'doctor',
+          methodName: 'submitDoctorReview',
+          parameters: _i1.testObjectToJson({
+            'reportId': reportId,
+            'notes': notes,
+            'action': action,
+            'visibleToPatient': visibleToPatient,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<bool>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
   _i3.Future<int> revisePrescription(
     _i1.TestSessionBuilder sessionBuilder, {
     required int originalPrescriptionId,

@@ -10,3 +10,8 @@ fields:
   uploadedBy: int
   reviewed: bool
   createdAt: DateTime?
+  doctorNotes: String?
+  visibleToPatient: bool, default=false
+  reviewAction: String?
+  reviewedAt: DateTime?
+  reviewedBy: int?

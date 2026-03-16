@@ -6,6 +6,80 @@ class DoctorEndpoint extends Endpoint {
   @override
   bool get requireLogin => true;
 
+  Future<void> _ensureUploadpatientRReviewColumns(Session session) async {
+    await session.db.unsafeExecute('''
+      ALTER TABLE "UploadpatientR"
+        ADD COLUMN IF NOT EXISTS doctor_notes TEXT,
+        ADD COLUMN IF NOT EXISTS visible_to_patient BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS review_action TEXT,
+        ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS reviewed_by INT REFERENCES users(user_id)
+    ''');
+  }
+
+  Future<void> _backfillUploadedLabResultsForDoctor(
+    Session session,
+    int doctorId,
+  ) async {
+    await session.db.unsafeExecute(
+      '''
+      INSERT INTO "UploadpatientR" (
+        patient_id,
+        type,
+        report_date,
+        file_path,
+        prescribed_doctor_id,
+        prescription_id,
+        uploaded_by,
+        reviewed,
+        created_at
+      )
+      SELECT
+        patient.user_id AS patient_id,
+        COALESCE(NULLIF(lt.test_name, ''), 'Lab Test Report') AS type,
+        COALESCE(tr.submitted_at::date, tr.created_at::date, CURRENT_DATE) AS report_date,
+        tr.attachment_path AS file_path,
+        matched_prescription.doctor_id AS prescribed_doctor_id,
+        matched_prescription.prescription_id AS prescription_id,
+        NULL AS uploaded_by,
+        FALSE AS reviewed,
+        COALESCE(tr.submitted_at, tr.created_at, NOW()) AS created_at
+      FROM test_results tr
+      LEFT JOIN lab_tests lt ON lt.test_id = tr.test_id
+      JOIN users patient
+        ON RIGHT(REGEXP_REPLACE(COALESCE(patient.phone, ''), '[^0-9]', '', 'g'), 11)
+         = RIGHT(REGEXP_REPLACE(COALESCE(tr.mobile_number, ''), '[^0-9]', '', 'g'), 11)
+      JOIN LATERAL (
+        SELECT p.prescription_id, p.doctor_id
+        FROM prescriptions p
+        WHERE p.patient_id = patient.user_id
+          AND p.doctor_id = @doctorId
+        ORDER BY
+          CASE
+            WHEN COALESCE(lt.test_name, '') <> ''
+             AND COALESCE(NULLIF(TRIM(p.test), ''), '') <> ''
+             AND LOWER(p.test) LIKE '%' || LOWER(COALESCE(lt.test_name, '')) || '%'
+            THEN 0
+            ELSE 1
+          END,
+          p.prescription_date DESC,
+          p.prescription_id DESC
+        LIMIT 1
+      ) matched_prescription ON TRUE
+      WHERE COALESCE(tr.is_uploaded, FALSE) = TRUE
+        AND COALESCE(tr.attachment_path, '') <> ''
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "UploadpatientR" r
+          WHERE r.patient_id = patient.user_id
+            AND r.prescribed_doctor_id = matched_prescription.doctor_id
+            AND COALESCE(r.file_path, '') = COALESCE(tr.attachment_path, '')
+        )
+      ''',
+      parameters: QueryParameters.named({'doctorId': doctorId}),
+    );
+  }
+
   Future<void> _ensureAppointmentTables(Session session) async {
     await session.db.unsafeExecute('''
       CREATE TABLE IF NOT EXISTS appointment_requests (
@@ -46,6 +120,8 @@ class DoctorEndpoint extends Endpoint {
   Future<DoctorHomeData> getDoctorHomeData(Session session) async {
     try {
       final resolvedDoctorId = requireAuthenticatedUserId(session);
+
+      await _backfillUploadedLabResultsForDoctor(session, resolvedDoctorId);
 
       final doctorRow = await session.db.unsafeQuery(
         'SELECT name, role::text AS role, profile_picture_url FROM users WHERE user_id = @id LIMIT 1',
@@ -220,17 +296,29 @@ class DoctorEndpoint extends Endpoint {
           r.report_id,
           r.type,
           r.report_date,
-          r.created_at,
-          r.prescription_id,
+          COALESCE(r.created_at, r.report_date::timestamp, NOW()) AS effective_created_at,
+          COALESCE(
+            r.prescription_id,
+            p.prescription_id,
+            (
+              SELECT p2.prescription_id
+              FROM prescriptions p2
+              WHERE p2.patient_id = r.patient_id
+                AND p2.doctor_id = COALESCE(r.prescribed_doctor_id, p.doctor_id, @id)
+              ORDER BY p2.prescription_id DESC
+              LIMIT 1
+            )
+          ) AS effective_prescription_id,
           COALESCE(u.name, '') AS uploaded_by_name
         FROM "UploadpatientR" r
+        LEFT JOIN prescriptions p ON p.prescription_id = r.prescription_id
         LEFT JOIN users u ON u.user_id = r.uploaded_by
-        WHERE r.prescribed_doctor_id = @id
+        WHERE COALESCE(r.prescribed_doctor_id, p.doctor_id) = @id
           AND (
             (r.created_at IS NOT NULL AND r.created_at >= (NOW() - INTERVAL '24 hours'))
             OR (r.report_date IS NOT NULL AND r.report_date >= (CURRENT_DATE - INTERVAL '1 day'))
           )
-        ORDER BY r.created_at DESC NULLS LAST, r.report_id DESC
+        ORDER BY effective_created_at DESC NULLS LAST, r.report_id DESC
         LIMIT 300
         ''',
         parameters: QueryParameters.named({'id': resolvedDoctorId}),
@@ -239,8 +327,7 @@ class DoctorEndpoint extends Endpoint {
       final reviewedReports = <DoctorHomeReviewedReport>[];
       for (final r in reportRows) {
         final m = r.toColumnMap();
-        final createdAt =
-            (m['created_at'] as DateTime?) ?? (m['report_date'] as DateTime?);
+        final createdAt = m['effective_created_at'] as DateTime?;
 
         if (createdAt == null) continue;
 
@@ -249,7 +336,7 @@ class DoctorEndpoint extends Endpoint {
             reportId: m['report_id'] as int?,
             type: _s(m['type']),
             uploadedByName: _s(m['uploaded_by_name']),
-            prescriptionId: m['prescription_id'] as int?,
+            prescriptionId: m['effective_prescription_id'] as int?,
             timeAgo: _timeAgo(createdAt, now),
           ),
         );
@@ -735,42 +822,67 @@ class DoctorEndpoint extends Endpoint {
       Session session, int doctorId) async {
     try {
       final resolvedDoctorId = requireAuthenticatedUserId(session);
+      await _ensureUploadpatientRReviewColumns(session);
+      await _backfillUploadedLabResultsForDoctor(session, resolvedDoctorId);
       final res = await session.db.unsafeQuery('''
       SELECT
         r.*,
+        COALESCE(r.created_at, r.report_date::timestamp, NOW()) AS effective_created_at,
+        COALESCE(
+          r.prescribed_doctor_id,
+          p.doctor_id,
+          (
+            SELECT p3.doctor_id
+            FROM prescriptions p3
+            WHERE p3.patient_id = r.patient_id
+            ORDER BY p3.prescription_id DESC
+            LIMIT 1
+          )
+        ) AS effective_doctor_id,
         COALESCE(
           r.prescription_id,
           (
             SELECT p2.prescription_id
             FROM prescriptions p2
             WHERE p2.patient_id = r.patient_id
-              AND p2.doctor_id = @id
+              AND p2.doctor_id = COALESCE(r.prescribed_doctor_id, p.doctor_id, @id)
             ORDER BY p2.prescription_id DESC
             LIMIT 1
           )
         ) AS effective_prescription_id
       FROM "UploadpatientR" r
-      WHERE r.prescribed_doctor_id = @id
-      ORDER BY created_at DESC
+      LEFT JOIN prescriptions p ON p.prescription_id = r.prescription_id
+      WHERE COALESCE(r.prescribed_doctor_id, p.doctor_id) = @id
+      ORDER BY effective_created_at DESC, r.report_id DESC
     ''', parameters: QueryParameters.named({'id': resolvedDoctorId}));
 
-      return res.map((row) {
+      final reports = res.map((row) {
         final map = row.toColumnMap();
-        return PatientExternalReport(
+        final report = PatientExternalReport(
           reportId: map['report_id'] as int?,
-          patientId: map['patient_id'] as int,
-          type: map['type'] as String,
-          reportDate: map['report_date'] as DateTime,
-          filePath: map['file_path'] as String,
-          prescribedDoctorId: map['prescribed_doctor_id'] as int,
+          patientId: map['patient_id'] as int? ?? 0,
+          type: map['type'] as String? ?? '',
+          reportDate: map['report_date'] as DateTime? ?? DateTime.now(),
+          filePath: map['file_path'] as String? ?? '',
+          prescribedDoctorId: map['effective_doctor_id'] as int? ?? 0,
           prescriptionId: map['effective_prescription_id'] as int?,
-          uploadedBy: map['uploaded_by'] as int,
+          uploadedBy: map['uploaded_by'] as int? ?? 0,
           reviewed: (map['reviewed'] as bool?) ?? false,
-          createdAt: map['created_at'] as DateTime?,
+          createdAt: map['effective_created_at'] as DateTime?,
+          doctorNotes: map['doctor_notes'] as String?,
+          visibleToPatient: (map['visible_to_patient'] as bool?) ?? false,
+          reviewAction: map['review_action'] as String?,
+          reviewedAt: map['reviewed_at'] as DateTime?,
+          reviewedBy: map['reviewed_by'] as int?,
         );
+        session.log(
+            '[DoctorReport] id=${report.reportId ?? 'null'} patient=${report.patientId} type=${report.type} filePath=${report.filePath} prescId=${report.prescriptionId} reviewed=${report.reviewed}',
+            level: LogLevel.info);
+        return report;
       }).toList();
+      return reports;
     } catch (e) {
-      print('Error fetching reports: $e');
+      session.log('Error fetching reports: $e', level: LogLevel.error);
       return [];
     }
   }
@@ -780,20 +892,161 @@ class DoctorEndpoint extends Endpoint {
     try {
       final resolvedDoctorId = requireAuthenticatedUserId(session);
 
-      final updated = await session.db.unsafeExecute(
+      final updatedRows = await session.db.unsafeQuery(
         '''
         UPDATE "UploadpatientR"
-        SET reviewed = TRUE
-        WHERE report_id = @rid AND prescribed_doctor_id = @did
+        SET
+          reviewed = TRUE,
+          prescribed_doctor_id = COALESCE(prescribed_doctor_id, @did)
+        WHERE report_id = @rid
+          AND (
+            prescribed_doctor_id = @did
+            OR (
+              prescribed_doctor_id IS NULL
+              AND EXISTS (
+                SELECT 1
+                FROM prescriptions p
+                WHERE p.prescription_id = "UploadpatientR".prescription_id
+                  AND p.doctor_id = @did
+              )
+            )
+          )
+        RETURNING patient_id, type, prescription_id
         ''',
         parameters:
             QueryParameters.named({'rid': reportId, 'did': resolvedDoctorId}),
       );
 
-      return updated > 0;
+      if (updatedRows.isEmpty) return false;
+
+      final row = updatedRows.first.toColumnMap();
+      final patientId = row['patient_id'] as int?;
+      final type = _s(row['type']);
+      final prescriptionId = row['prescription_id'] as int?;
+
+      if (patientId != null) {
+        await session.db.unsafeExecute(
+          '''
+          INSERT INTO notifications (user_id, title, message, is_read, created_at)
+          VALUES (@uid, 'Report Reviewed', @message, FALSE, NOW())
+          ''',
+          parameters: QueryParameters.named({
+            'uid': patientId,
+            'message':
+                'Your ${type.isEmpty ? 'lab' : type} report has been reviewed by doctor.${prescriptionId == null ? '' : ' Prescription ID: $prescriptionId'}',
+          }),
+        );
+      }
+
+      return true;
     } catch (e, st) {
       session.log(
         'markReportReviewed failed: $e',
+        level: LogLevel.error,
+        stackTrace: st,
+      );
+      return false;
+    }
+  }
+
+  /// Submit a full doctor review: clinical notes, action, patient portal visibility.
+  Future<bool> submitDoctorReview(
+    Session session,
+    int reportId,
+    String notes,
+    String action,
+    bool visibleToPatient,
+  ) async {
+    try {
+      final resolvedDoctorId = requireAuthenticatedUserId(session);
+      await _ensureUploadpatientRReviewColumns(session);
+      final trimmedNotes = notes.trim();
+      final normalizedAction =
+          action.trim().isEmpty ? 'No Action' : action.trim();
+
+      final updatedRows = await session.db.unsafeQuery(
+        '''
+        UPDATE "UploadpatientR"
+        SET
+          reviewed = TRUE,
+          prescribed_doctor_id = COALESCE(prescribed_doctor_id, @did),
+          doctor_notes = @notes,
+          review_action = @action,
+          visible_to_patient = @visible,
+          reviewed_at = NOW(),
+          reviewed_by = @did
+        WHERE report_id = @rid
+          AND (
+            prescribed_doctor_id = @did
+            OR (
+              prescribed_doctor_id IS NULL
+              AND (
+                EXISTS (
+                  SELECT 1
+                  FROM prescriptions p
+                  WHERE p.prescription_id = "UploadpatientR".prescription_id
+                    AND p.doctor_id = @did
+                )
+                OR EXISTS (
+                  SELECT 1
+                  FROM prescriptions p
+                  WHERE p.patient_id = "UploadpatientR".patient_id
+                    AND p.doctor_id = @did
+                )
+              )
+            )
+          )
+        RETURNING patient_id, type, prescription_id
+        ''',
+        parameters: QueryParameters.named({
+          'rid': reportId,
+          'did': resolvedDoctorId,
+          'notes': trimmedNotes,
+          'action': normalizedAction,
+          'visible': visibleToPatient,
+        }),
+      );
+
+      if (updatedRows.isEmpty) {
+        session.log(
+          'submitDoctorReview updated 0 rows for reportId=$reportId doctorId=$resolvedDoctorId',
+          level: LogLevel.warning,
+        );
+        return false;
+      }
+
+      final row = updatedRows.first.toColumnMap();
+      final patientId = row['patient_id'] as int?;
+      final type = _s(row['type']);
+
+      if (patientId != null) {
+        try {
+          final noteText = trimmedNotes.isEmpty ? '' : ' Notes: $trimmedNotes';
+          await session.db.unsafeExecute(
+            '''
+            INSERT INTO notifications (user_id, title, message, is_read, created_at)
+            VALUES (@uid, @title, @message, FALSE, NOW())
+            ''',
+            parameters: QueryParameters.named({
+              'uid': patientId,
+              'title': 'Doctor Review: $normalizedAction',
+              'message':
+                  'Your ${type.isEmpty ? 'lab' : type} report has been reviewed by your doctor. Action: $normalizedAction.$noteText',
+            }),
+          );
+        } catch (notifyError, notifyStack) {
+          session.log(
+            'submitDoctorReview notification failed: $notifyError',
+            level: LogLevel.warning,
+            stackTrace: notifyStack,
+          );
+        }
+      }
+
+      return true;
+    } catch (e, st) {
+      session.log(
+        'submitDoctorReview failed: $e',
         level: LogLevel.error,
         stackTrace: st,
       );
@@ -1046,7 +1299,7 @@ class DoctorEndpoint extends Endpoint {
       throw Exception('Invalid status. Use CONFIRMED or DECLINED.');
     }
 
-    final updated = await session.db.unsafeExecute(
+    final updatedRows = await session.db.unsafeQuery(
       '''
       UPDATE appointment_requests
       SET
@@ -1057,6 +1310,7 @@ class DoctorEndpoint extends Endpoint {
       WHERE request_id = @id
         AND doctor_id = @did
         AND status = 'PENDING'
+      RETURNING patient_id, appointment_date, appointment_time, status, decline_reason
       ''',
       parameters: QueryParameters.named({
         'status': normalizedStatus,
@@ -1068,7 +1322,45 @@ class DoctorEndpoint extends Endpoint {
       }),
     );
 
-    return updated > 0;
+    if (updatedRows.isEmpty) return false;
+
+    try {
+      final row = updatedRows.first.toColumnMap();
+      final patientId = row['patient_id'] as int?;
+      final apptDate = row['appointment_date'] as DateTime?;
+      final apptTime = row['appointment_time']?.toString() ?? '';
+      final statusText = (row['status']?.toString() ?? '').toUpperCase();
+      final declineText = row['decline_reason']?.toString();
+
+      if (patientId != null) {
+        final title = statusText == 'CONFIRMED'
+            ? 'Appointment Confirmed'
+            : 'Appointment Declined';
+        final message = statusText == 'CONFIRMED'
+            ? 'Your appointment (ID: $appointmentRequestId) is confirmed for ${apptDate?.toIso8601String().split('T').first ?? '-'} at $apptTime.'
+            : 'Your appointment (ID: $appointmentRequestId) was declined.${(declineText != null && declineText.trim().isNotEmpty) ? ' Reason: $declineText' : ''}';
+
+        await session.db.unsafeExecute(
+          '''
+          INSERT INTO notifications (user_id, title, message, is_read, created_at)
+          VALUES (@uid, @title, @message, FALSE, NOW())
+          ''',
+          parameters: QueryParameters.named({
+            'uid': patientId,
+            'title': title,
+            'message': message,
+          }),
+        );
+      }
+    } catch (notifyError, notifyStack) {
+      session.log(
+        'updateAppointmentRequestStatus notification failed: $notifyError',
+        level: LogLevel.warning,
+        stackTrace: notifyStack,
+      );
+    }
+
+    return true;
   }
 
   /// Bottom sheet: single prescription full details + medicines

@@ -29,6 +29,7 @@ class RoleDashboardController extends ChangeNotifier {
   // Doctor
   DoctorHomeData? doctorHome;
   DoctorProfile? doctorProfile;
+  List<PatientExternalReport> doctorReports = [];
   List<PatientPrescriptionListItem> doctorPrescriptionList = [];
   List<AppointmentRequestItem> doctorAppointmentRequests = [];
 
@@ -108,10 +109,11 @@ class RoleDashboardController extends ChangeNotifier {
     }
     try {
       final notifications = await _service.getPatientNotifications();
+      final counts = await _service.getNotificationCounts();
       patientNotifications = notifications.take(limit).toList();
-      unreadNotificationCount = patientNotifications
-          .where((n) => !n.isRead)
-          .length;
+      unreadNotificationCount =
+          (counts['unread'] ??
+          patientNotifications.where((n) => !n.isRead).length);
     } catch (e) {
       error = e.toString();
     } finally {
@@ -174,7 +176,7 @@ class RoleDashboardController extends ChangeNotifier {
   }
 
   void startNotificationRealtimeSync({
-    Duration interval = const Duration(seconds: 10),
+    Duration interval = const Duration(seconds: 3),
   }) {
     _notificationTimer ??= Timer.periodic(interval, (_) {
       refreshNotifications(silent: true);
@@ -305,6 +307,7 @@ class RoleDashboardController extends ChangeNotifier {
   Future<void> loadDoctor() => _load(() async {
     doctorHome = await _service.getDoctorHome();
     doctorProfile = await _service.getDoctorProfile();
+    doctorReports = await _service.getDoctorReports();
     doctorPrescriptionList = await _service.getDoctorPrescriptions();
     try {
       doctorAppointmentRequests = await _service.getDoctorAppointmentRequests(
@@ -315,6 +318,63 @@ class RoleDashboardController extends ChangeNotifier {
       doctorAppointmentRequests = const [];
     }
   });
+
+  Future<void> loadDoctorReports() => _load(() async {
+    doctorReports = await _service.getDoctorReports();
+  });
+
+  Future<bool> markDoctorReportReviewed(int reportId) async {
+    try {
+      final ok = await _service.markDoctorReportReviewed(reportId);
+      if (ok) {
+        doctorReports = doctorReports
+            .map((r) => r.reportId == reportId ? r.copyWith(reviewed: true) : r)
+            .toList();
+        notifyListeners();
+      }
+      return ok;
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> submitDoctorReview({
+    required int reportId,
+    required String notes,
+    required String action,
+    required bool visibleToPatient,
+  }) async {
+    try {
+      final ok = await _service.submitDoctorReview(
+        reportId: reportId,
+        notes: notes,
+        action: action,
+        visibleToPatient: visibleToPatient,
+      );
+      if (ok) {
+        doctorReports = doctorReports
+            .map(
+              (r) => r.reportId == reportId
+                  ? r.copyWith(
+                      reviewed: true,
+                      doctorNotes: notes,
+                      reviewAction: action,
+                      visibleToPatient: visibleToPatient,
+                    )
+                  : r,
+            )
+            .toList();
+        notifyListeners();
+      }
+      return ok;
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
 
   Future<void> loadDoctorAppointmentRequests({
     String? status,

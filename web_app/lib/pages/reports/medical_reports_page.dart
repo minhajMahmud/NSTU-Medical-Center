@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_html/html.dart' as html;
+import 'dart:typed_data';
 import 'package:backend_client/backend_client.dart';
 
 import '../../controllers/role_dashboard_controller.dart';
@@ -63,7 +64,29 @@ class _MedicalReportsPageState extends State<MedicalReportsPage> {
     return base.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
   }
 
-  void _openReport(PatientReportDto report) {
+  bool _isPdfUrl(String url) {
+    final lower = url.toLowerCase();
+    return lower.endsWith('.pdf') || lower.contains('.pdf?');
+  }
+
+  Future<String?> _createPdfObjectUrl(String src) async {
+    try {
+      final response = await html.HttpRequest.request(
+        src,
+        method: 'GET',
+        responseType: 'arraybuffer',
+      );
+      final raw = response.response;
+      if (raw is! ByteBuffer) return null;
+      final bytes = Uint8List.view(raw);
+      final blob = html.Blob(<dynamic>[bytes], 'application/pdf');
+      return html.Url.createObjectUrlFromBlob(blob);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _openReport(PatientReportDto report) async {
     final url = report.fileUrl?.trim();
     if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -71,7 +94,23 @@ class _MedicalReportsPageState extends State<MedicalReportsPage> {
       );
       return;
     }
-    html.window.open(url, '_blank');
+    var viewUrl = url;
+    if (_isPdfUrl(url)) {
+      final objectUrl = await _createPdfObjectUrl(url);
+      if (objectUrl != null) {
+        viewUrl = objectUrl;
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Direct PDF preview unavailable. Opening original file instead.',
+            ),
+          ),
+        );
+      }
+    }
+    html.window.open(viewUrl, '_blank');
   }
 
   void _downloadReport(PatientReportDto report) {

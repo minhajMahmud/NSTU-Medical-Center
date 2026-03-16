@@ -9,6 +9,73 @@ class LabEndpoint extends Endpoint {
   @override
   bool get requireLogin => true;
 
+  Future<void> _mirrorUploadedResultToDoctorReports(
+    Session session, {
+    required int resultId,
+    int? uploadedByUserId,
+  }) async {
+    await session.db.unsafeExecute(
+      '''
+      INSERT INTO "UploadpatientR" (
+        patient_id,
+        type,
+        report_date,
+        file_path,
+        prescribed_doctor_id,
+        prescription_id,
+        uploaded_by,
+        reviewed,
+        created_at
+      )
+      SELECT
+        patient.user_id AS patient_id,
+        COALESCE(NULLIF(lt.test_name, ''), 'Lab Test Report') AS type,
+        COALESCE(tr.submitted_at::date, tr.created_at::date, CURRENT_DATE) AS report_date,
+        tr.attachment_path AS file_path,
+        matched_prescription.doctor_id AS prescribed_doctor_id,
+        matched_prescription.prescription_id AS prescription_id,
+        @uploadedBy AS uploaded_by,
+        FALSE AS reviewed,
+        COALESCE(tr.submitted_at, tr.created_at, NOW()) AS created_at
+      FROM test_results tr
+      LEFT JOIN lab_tests lt ON lt.test_id = tr.test_id
+      JOIN users patient
+        ON RIGHT(REGEXP_REPLACE(COALESCE(patient.phone, ''), '[^0-9]', '', 'g'), 11)
+         = RIGHT(REGEXP_REPLACE(COALESCE(tr.mobile_number, ''), '[^0-9]', '', 'g'), 11)
+      JOIN LATERAL (
+        SELECT p.prescription_id, p.doctor_id
+        FROM prescriptions p
+        WHERE p.patient_id = patient.user_id
+        ORDER BY
+          CASE
+            WHEN COALESCE(lt.test_name, '') <> ''
+             AND COALESCE(NULLIF(TRIM(p.test), ''), '') <> ''
+             AND LOWER(p.test) LIKE '%' || LOWER(COALESCE(lt.test_name, '')) || '%'
+            THEN 0
+            ELSE 1
+          END,
+          p.prescription_date DESC,
+          p.prescription_id DESC
+        LIMIT 1
+      ) matched_prescription ON TRUE
+      WHERE tr.result_id = @resultId
+        AND COALESCE(tr.is_uploaded, FALSE) = TRUE
+        AND COALESCE(tr.attachment_path, '') <> ''
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "UploadpatientR" r
+          WHERE r.patient_id = patient.user_id
+            AND r.prescribed_doctor_id = matched_prescription.doctor_id
+            AND COALESCE(r.file_path, '') = COALESCE(tr.attachment_path, '')
+        )
+      ''',
+      parameters: QueryParameters.named({
+        'resultId': resultId,
+        'uploadedBy': uploadedByUserId,
+      }),
+    );
+  }
+
   String _normalizeAnalyticsPatientType(String patientType) {
     final t = patientType.trim().toUpperCase();
     switch (t) {
@@ -728,6 +795,7 @@ class LabEndpoint extends Endpoint {
     required String attachmentUrl,
   }) async {
     try {
+      final resolvedUserId = requireAuthenticatedUserId(session);
       final url = attachmentUrl.trim();
       if (!(url.startsWith('http://') || url.startsWith('https://'))) {
         return false;
@@ -771,6 +839,126 @@ class LabEndpoint extends Endpoint {
           'url': url,
         }),
       );
+
+      await _mirrorUploadedResultToDoctorReports(
+        session,
+        resultId: resultId,
+        uploadedByUserId: resolvedUserId,
+      );
+
+      // Notify assigned doctor about newly submitted lab report.
+      try {
+        final metaRows = await session.db.unsafeQuery(
+          '''
+          SELECT
+            COALESCE(NULLIF(lt.test_name, ''), 'Lab Report') AS report_type,
+            COALESCE(NULLIF(tr.patient_name, ''), 'Patient') AS patient_name,
+            tr.mobile_number
+          FROM test_results tr
+          LEFT JOIN lab_tests lt ON lt.test_id = tr.test_id
+          WHERE tr.result_id = @resultId
+          LIMIT 1
+          ''',
+          parameters: QueryParameters.named({'resultId': resultId}),
+        );
+
+        if (metaRows.isEmpty) {
+          session.log(
+            'Doctor notification skipped: missing test_results row for resultId=$resultId',
+            level: LogLevel.warning,
+          );
+        }
+
+        final meta = metaRows.isEmpty
+            ? <String, dynamic>{}
+            : metaRows.first.toColumnMap();
+        final reportType = meta['report_type']?.toString() ?? 'Lab Report';
+        final patientName = meta['patient_name']?.toString() ?? 'Patient';
+        final mobileNumber = meta['mobile_number']?.toString() ?? '';
+
+        final doctorRows = await session.db.unsafeQuery(
+          '''
+          WITH matched_patient AS (
+            SELECT u.user_id
+            FROM users u
+            WHERE RIGHT(REGEXP_REPLACE(COALESCE(u.phone, ''), '[^0-9]', '', 'g'), 11)
+                = RIGHT(REGEXP_REPLACE(@mobile, '[^0-9]', '', 'g'), 11)
+            LIMIT 1
+          )
+          SELECT DISTINCT doctor_id
+          FROM (
+            SELECT r.prescribed_doctor_id AS doctor_id
+            FROM "UploadpatientR" r
+            WHERE COALESCE(r.file_path, '') = @url
+              AND r.prescribed_doctor_id IS NOT NULL
+
+            UNION
+
+            SELECT p.doctor_id AS doctor_id
+            FROM prescriptions p
+            JOIN matched_patient mp ON mp.user_id = p.patient_id
+          ) doctors
+          WHERE doctor_id IS NOT NULL
+          ''',
+          parameters:
+              QueryParameters.named({'url': url, 'mobile': mobileNumber}),
+        );
+
+        final fallbackDoctorRows = await session.db.unsafeQuery(
+          '''
+          SELECT DISTINCT p.doctor_id
+          FROM test_results tr
+          JOIN users u
+            ON RIGHT(REGEXP_REPLACE(COALESCE(u.phone, ''), '[^0-9]', '', 'g'), 11)
+             = RIGHT(REGEXP_REPLACE(COALESCE(tr.mobile_number, ''), '[^0-9]', '', 'g'), 11)
+          JOIN prescriptions p ON p.patient_id = u.user_id
+          WHERE tr.result_id = @resultId
+          ''',
+          parameters: QueryParameters.named({'resultId': resultId}),
+        );
+
+        final doctorIds = <int>{
+          ...doctorRows
+              .map((r) => r.toColumnMap()['doctor_id'] as int?)
+              .whereType<int>(),
+          ...fallbackDoctorRows
+              .map((r) => r.toColumnMap()['doctor_id'] as int?)
+              .whereType<int>(),
+        };
+
+        if (doctorIds.isEmpty) {
+          session.log(
+            'No doctor recipients resolved for lab submit notification. resultId=$resultId, mobile=$mobileNumber, url=$url',
+            level: LogLevel.warning,
+          );
+        } else {
+          session.log(
+            'Resolved doctor recipients for lab submit notification. resultId=$resultId, doctors=${doctorIds.join(',')}',
+            level: LogLevel.info,
+          );
+        }
+
+        for (final doctorId in doctorIds) {
+          await session.db.unsafeExecute(
+            '''
+            INSERT INTO notifications (user_id, title, message, is_read, created_at)
+            VALUES (@uid, @title, @message, FALSE, NOW())
+            ''',
+            parameters: QueryParameters.named({
+              'uid': doctorId,
+              'title': 'New Lab Report Submitted',
+              'message':
+                  '$patientName submitted $reportType. Please review it from your reports page. [route:/doctor/reports]',
+            }),
+          );
+        }
+      } catch (notifyError, notifyStack) {
+        session.log(
+          'Doctor notification for lab submit failed: $notifyError',
+          level: LogLevel.warning,
+          stackTrace: notifyStack,
+        );
+      }
 
       // Optionally, send SMS
       final rows = await session.db.unsafeQuery(

@@ -105,6 +105,21 @@ class RoleDashboardService {
     limit: limit,
     offset: 0,
   );
+  Future<List<PatientExternalReport>> getDoctorReports() =>
+      _client.doctor.getReportsForDoctor(0);
+  Future<bool> markDoctorReportReviewed(int reportId) =>
+      _client.doctor.markReportReviewed(reportId);
+  Future<bool> submitDoctorReview({
+    required int reportId,
+    required String notes,
+    required String action,
+    required bool visibleToPatient,
+  }) => _client.doctor.submitDoctorReview(
+    reportId,
+    notes,
+    action,
+    visibleToPatient,
+  );
   Future<List<AppointmentRequestItem>> getDoctorAppointmentRequests({
     String? status,
     String? query,
