@@ -12,12 +12,35 @@ class AdminInventoryEndpoints extends Endpoint {
   @override
   bool get requireLogin => true;
 
+  Future<void> _ensureInventorySchemaCompat(Session session) async {
+    await session.db.unsafeExecute('''
+      ALTER TABLE inventory_item
+      ADD COLUMN IF NOT EXISTS minimum_stock INT NOT NULL DEFAULT 0
+    ''');
+
+    await session.db.unsafeExecute('''
+      ALTER TABLE inventory_item
+      ADD COLUMN IF NOT EXISTS can_restock_dispenser BOOLEAN NOT NULL DEFAULT FALSE
+    ''');
+
+    await session.db.unsafeExecute('''
+      ALTER TABLE inventory_stock
+      ADD COLUMN IF NOT EXISTS last_updated TIMESTAMP NOT NULL DEFAULT NOW()
+    ''');
+
+    await session.db.unsafeExecute('''
+      ALTER TABLE inventory_transaction
+      ADD COLUMN IF NOT EXISTS performed_by INT REFERENCES users(user_id)
+    ''');
+  }
+
   Future<bool> addInventoryCategory(
     Session session,
     String name,
     String? description,
   ) async {
     try {
+      await _ensureInventorySchemaCompat(session);
       await session.db.unsafeExecute(
         '''
       INSERT INTO inventory_category (category_name, description)
@@ -39,6 +62,7 @@ class AdminInventoryEndpoints extends Endpoint {
   Future<List<InventoryCategory>> listInventoryCategories(
       Session session) async {
     try {
+      await _ensureInventorySchemaCompat(session);
       final result = await session.db.unsafeQuery(
         '''
       SELECT category_id, category_name, description
@@ -72,6 +96,7 @@ class AdminInventoryEndpoints extends Endpoint {
     bool canRestockDispenser = false,
   }) async {
     try {
+      await _ensureInventorySchemaCompat(session);
       final resolvedAdminUserId = requireAuthenticatedUserId(session);
       await session.db.unsafeExecute('BEGIN');
 
@@ -138,6 +163,7 @@ class AdminInventoryEndpoints extends Endpoint {
     required String type, // IN or OUT
   }) async {
     try {
+      await _ensureInventorySchemaCompat(session);
       if (quantity <= 0) return false;
 
       final resolvedUserId = requireAuthenticatedUserId(session);
@@ -232,6 +258,7 @@ class AdminInventoryEndpoints extends Endpoint {
     required bool canRestock,
   }) async {
     try {
+      await _ensureInventorySchemaCompat(session);
       final resolvedAdminUserId = requireAuthenticatedUserId(session);
       await session.db.unsafeExecute('BEGIN');
 
@@ -274,6 +301,7 @@ class AdminInventoryEndpoints extends Endpoint {
 
   Future<List<InventoryItemInfo>> listInventoryItems(Session session) async {
     try {
+      await _ensureInventorySchemaCompat(session);
       final result = await session.db.unsafeQuery('''
       SELECT
         i.item_id,
@@ -330,6 +358,7 @@ class AdminInventoryEndpoints extends Endpoint {
     required int newThreshold,
   }) async {
     try {
+      await _ensureInventorySchemaCompat(session);
       final resolvedAdminUserId = requireAuthenticatedUserId(session);
       await session.db.unsafeExecute('BEGIN');
 
@@ -371,6 +400,7 @@ class AdminInventoryEndpoints extends Endpoint {
     int itemId,
   ) async {
     try {
+      await _ensureInventorySchemaCompat(session);
       final result = await session.db.unsafeQuery(
         '''
       SELECT item_id, transaction_type, quantity, created_at
@@ -403,6 +433,7 @@ class AdminInventoryEndpoints extends Endpoint {
     int offset,
   ) async {
     try {
+      await _ensureInventorySchemaCompat(session);
       final result = await session.db.unsafeQuery(
         '''
       SELECT

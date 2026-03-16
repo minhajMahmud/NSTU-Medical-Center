@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../controllers/role_dashboard_controller.dart';
@@ -27,6 +28,17 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
   Widget build(BuildContext context) {
     final c = context.watch<RoleDashboardController>();
     final a = c.adminAnalytics;
+    final query = (GoRouterState.of(context).uri.queryParameters['q'] ?? '')
+        .trim()
+        .toLowerCase();
+
+    final topMedicines = (a?.topMedicines ?? const [])
+        .where(
+          (m) => query.isEmpty
+              ? true
+              : '${m.medicineName} ${m.used}'.toLowerCase().contains(query),
+        )
+        .toList();
 
     return DashboardShell(
       child: c.isLoading
@@ -49,12 +61,22 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
                   'Top Medicines',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
+                if (query.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6, bottom: 10),
+                    child: Text(
+                      'Showing ${topMedicines.length} result(s) for "$query"',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ),
                 AppDataTable(
                   columns: const [
                     DataColumn(label: Text('Medicine')),
                     DataColumn(label: Text('Used')),
                   ],
-                  rows: (a?.topMedicines ?? const [])
+                  rows: topMedicines
                       .map(
                         (m) => DataRow(
                           cells: [

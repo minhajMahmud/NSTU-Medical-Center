@@ -30,6 +30,10 @@ class DashboardSidebar extends StatelessWidget {
       return const _LabDashboardSidebar();
     }
 
+    if (role == AppRole.admin) {
+      return const _AdminDashboardSidebar();
+    }
+
     final items = _itemsForRole(role);
     final path = GoRouterState.of(context).uri.path;
     final selected = _indexFromLocation(path, items);
@@ -168,9 +172,15 @@ class DashboardSidebar extends StatelessWidget {
           ),
           _NavItem(
             route: '/admin/users',
-            label: 'Users',
+            label: 'User Management',
             icon: Icons.groups_outlined,
             selectedIcon: Icons.groups,
+          ),
+          _NavItem(
+            route: '/admin/roster',
+            label: 'Staff Rostering',
+            icon: Icons.event_note_outlined,
+            selectedIcon: Icons.event_note,
           ),
           _NavItem(
             route: '/admin/inventory',
@@ -179,10 +189,10 @@ class DashboardSidebar extends StatelessWidget {
             selectedIcon: Icons.inventory_2,
           ),
           _NavItem(
-            route: '/admin/reports',
-            label: 'Reports',
-            icon: Icons.insights_outlined,
-            selectedIcon: Icons.insights,
+            route: '/admin/ambulance',
+            label: 'Ambulance',
+            icon: Icons.local_taxi_outlined,
+            selectedIcon: Icons.local_taxi,
           ),
         ];
       case AppRole.lab:
@@ -231,6 +241,213 @@ class DashboardSidebar extends StatelessWidget {
           ),
         ];
     }
+  }
+}
+
+class _AdminDashboardSidebar extends StatelessWidget {
+  const _AdminDashboardSidebar();
+
+  @override
+  Widget build(BuildContext context) {
+    final path = GoRouterState.of(context).uri.path;
+    final auth = context.read<AuthController>();
+
+    final items = const [
+      _NavItem(
+        route: '/admin/dashboard',
+        label: 'Dashboard',
+        icon: Icons.dashboard_outlined,
+        selectedIcon: Icons.dashboard,
+      ),
+      _NavItem(
+        route: '/admin/users',
+        label: 'User Management',
+        icon: Icons.groups_outlined,
+        selectedIcon: Icons.groups,
+      ),
+      _NavItem(
+        route: '/admin/roster',
+        label: 'Staff Rostering',
+        icon: Icons.event_note_outlined,
+        selectedIcon: Icons.event_note,
+      ),
+      _NavItem(
+        route: '/admin/inventory',
+        label: 'Inventory',
+        icon: Icons.inventory_2_outlined,
+        selectedIcon: Icons.inventory_2,
+      ),
+      _NavItem(
+        route: '/admin/ambulance',
+        label: 'Ambulance',
+        icon: Icons.local_taxi_outlined,
+        selectedIcon: Icons.local_taxi,
+      ),
+    ];
+
+    return Container(
+      width: 248,
+      color: const Color(0xFFF3F4F6),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              child: Row(
+                children: [
+                  Container(
+                    height: 36,
+                    width: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1D4ED8),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.local_hospital_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'NSTU Medical',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Admin Portal',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 4),
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final selected = path.startsWith(item.route);
+                  return Container(
+                    decoration: selected
+                        ? BoxDecoration(
+                            color: const Color(0xFFE8F0FE),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border(
+                              left: BorderSide(
+                                color: const Color(0xFF1D4ED8),
+                                width: 3,
+                              ),
+                            ),
+                          )
+                        : null,
+                    child: ListTile(
+                      dense: true,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      leading: Icon(
+                        selected ? item.selectedIcon : item.icon,
+                        color: selected
+                            ? const Color(0xFF1D4ED8)
+                            : const Color(0xFF475569),
+                        size: 20,
+                      ),
+                      title: Text(
+                        item.label,
+                        style: TextStyle(
+                          color: selected
+                              ? const Color(0xFF1D4ED8)
+                              : const Color(0xFF0F172A),
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                      onTap: () => context.go(item.route),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Color(0xFFF59E0B),
+                      child: Text(
+                        'A',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Administrator',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            'Super Admin',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Logout',
+                      onPressed: () async {
+                        await auth.logout();
+                        if (context.mounted) context.go('/login');
+                      },
+                      icon: const Icon(Icons.logout_rounded),
+                      color: const Color(0xFF64748B),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

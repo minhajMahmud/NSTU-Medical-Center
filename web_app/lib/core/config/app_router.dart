@@ -3,8 +3,10 @@ import 'package:go_router/go_router.dart';
 import '../../controllers/auth_controller.dart';
 import '../../core/utils/role_utils.dart';
 import '../../pages/admin/admin_inventory_page.dart';
+import '../../pages/admin/admin_ambulance_page.dart';
 import '../../pages/admin/admin_page.dart';
 import '../../pages/admin/admin_reports_page.dart';
+import '../../pages/admin/admin_staff_roster_page.dart';
 import '../../pages/admin/admin_users_page.dart';
 import '../../pages/appointments/appointments_page.dart';
 import '../../pages/dashboard/patient_dashboard_page.dart';
@@ -176,12 +178,20 @@ GoRouter createAppRouter(AuthController auth) {
       GoRoute(path: '/admin/dashboard', builder: (_, __) => const AdminPage()),
       GoRoute(path: '/admin/users', builder: (_, __) => const AdminUsersPage()),
       GoRoute(
+        path: '/admin/roster',
+        builder: (_, __) => const AdminStaffRosterPage(),
+      ),
+      GoRoute(
         path: '/admin/inventory',
         builder: (_, __) => const AdminInventoryPage(),
       ),
       GoRoute(
         path: '/admin/reports',
         builder: (_, __) => const AdminReportsPage(),
+      ),
+      GoRoute(
+        path: '/admin/ambulance',
+        builder: (_, __) => const AdminAmbulancePage(),
       ),
 
       GoRoute(

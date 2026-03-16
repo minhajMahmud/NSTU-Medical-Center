@@ -376,13 +376,14 @@ class AdminEndpoints extends Endpoint {
 
       // Fetch user's name and role to populate staff_name and staff_role
       final ures = await session.db.unsafeQuery(
-        'SELECT name, role::text AS role FROM users WHERE user_id = @uid::bigint LIMIT 1',
+        'SELECT name, role::text AS role FROM users WHERE user_id = @uid::bigint AND is_active = TRUE LIMIT 1',
         parameters: QueryParameters.named({'uid': staffId}),
       );
 
       if (ures.isEmpty) {
-        // No user found with provided id -> reject
-        session.log('saveRoster rejected: user not found for staffId=$staffId',
+        // No active user found with provided id -> reject
+        session.log(
+            'saveRoster rejected: active user not found for staffId=$staffId',
             level: LogLevel.info);
         return false;
       }
@@ -464,6 +465,7 @@ class AdminEndpoints extends Endpoint {
       SELECT u.user_id, u.name, u.role::text AS role
       FROM users u
       WHERE lower(u.role::text) IN ('admin','doctor','dispenser','labstaff','lab_staff','lab','staff')
+        AND u.is_active = TRUE
       ORDER BY u.name
       LIMIT @lim
       ''',

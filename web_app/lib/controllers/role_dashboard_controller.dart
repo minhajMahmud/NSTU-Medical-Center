@@ -40,6 +40,10 @@ class RoleDashboardController extends ChangeNotifier {
   List<AuditEntry> adminAudits = [];
   List<UserListItem> adminUsers = [];
   List<InventoryItemInfo> adminInventory = [];
+  List<InventoryCategory> adminInventoryCategories = [];
+  List<Roster> adminRosters = [];
+  List<Rosterlists> adminRosterStaff = [];
+  List<AmbulanceContact> adminAmbulanceContacts = [];
 
   // Lab
   LabToday? labSummary;
@@ -522,7 +526,369 @@ class RoleDashboardController extends ChangeNotifier {
     adminAudits = await _service.getRecentAudit();
     adminUsers = await _service.getAdminUsers();
     adminInventory = await _service.getAdminInventory();
+    adminInventoryCategories = await _service.getAdminInventoryCategories();
+    adminAmbulanceContacts = await _service.getAdminAmbulanceContacts();
   });
+
+  Future<void> loadAdminInventoryOnly() => _load(() async {
+    adminInventory = await _service.getAdminInventory();
+    adminInventoryCategories = await _service.getAdminInventoryCategories();
+  });
+
+  Future<bool> addAdminInventoryCategory({
+    required String name,
+    String? description,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.addAdminInventoryCategory(
+        name: name,
+        description: description,
+      );
+      if (!ok) {
+        error = 'Failed to add inventory category';
+        return false;
+      }
+      adminInventoryCategories = await _service.getAdminInventoryCategories();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> addAdminInventoryItem({
+    required int categoryId,
+    required String itemName,
+    required String unit,
+    required int minimumStock,
+    required int initialStock,
+    required bool canRestockDispenser,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.addAdminInventoryItem(
+        categoryId: categoryId,
+        itemName: itemName,
+        unit: unit,
+        minimumStock: minimumStock,
+        initialStock: initialStock,
+        canRestockDispenser: canRestockDispenser,
+      );
+      if (!ok) {
+        error = 'Failed to add inventory item';
+        return false;
+      }
+      adminInventory = await _service.getAdminInventory();
+      adminInventoryCategories = await _service.getAdminInventoryCategories();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateAdminInventoryStock({
+    required int itemId,
+    required int quantity,
+    required String type,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.updateAdminInventoryStock(
+        itemId: itemId,
+        quantity: quantity,
+        type: type,
+      );
+      if (!ok) {
+        error = 'Failed to update inventory stock';
+        return false;
+      }
+      adminInventory = await _service.getAdminInventory();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateAdminDispenserRestockFlag({
+    required int itemId,
+    required bool canRestock,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.updateAdminDispenserRestockFlag(
+        itemId: itemId,
+        canRestock: canRestock,
+      );
+      if (!ok) {
+        error = 'Failed to update restock permission';
+        return false;
+      }
+      adminInventory = await _service.getAdminInventory();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateAdminMinimumThreshold({
+    required int itemId,
+    required int newThreshold,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.updateAdminMinimumThreshold(
+        itemId: itemId,
+        newThreshold: newThreshold,
+      );
+      if (!ok) {
+        error = 'Failed to update minimum threshold';
+        return false;
+      }
+      adminInventory = await _service.getAdminInventory();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadAdminUsersOnly({String role = 'ALL'}) => _load(() async {
+    adminUsers = await _service.getAdminUsers(role: role);
+  });
+
+  Future<void> loadAdminRostersForDate(DateTime date) => _load(() async {
+    final day = DateTime(date.year, date.month, date.day);
+    adminRosterStaff = await _service.getAdminStaffList(limit: 300);
+    adminRosters = await _service.getAdminRosters(
+      fromDate: day,
+      toDate: day,
+      includeDeleted: false,
+    );
+  });
+
+  Future<bool> saveAdminRosterAssignment({
+    String rosterId = '',
+    required String staffId,
+    required String shiftType,
+    required DateTime shiftDate,
+    String timeRange = '',
+    String status = 'ACTIVE',
+    String? approvedBy,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.saveAdminRoster(
+        rosterId: rosterId,
+        staffId: staffId,
+        shiftType: shiftType,
+        shiftDate: shiftDate,
+        timeRange: timeRange,
+        status: status,
+        approvedBy: approvedBy,
+      );
+      if (!ok) {
+        error = 'Failed to save roster assignment';
+        return false;
+      }
+      final day = DateTime(shiftDate.year, shiftDate.month, shiftDate.day);
+      adminRosters = await _service.getAdminRosters(
+        fromDate: day,
+        toDate: day,
+        includeDeleted: false,
+      );
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteAdminRosterAssignment(
+    int rosterId,
+    DateTime shiftDate,
+  ) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.deleteAdminRoster(rosterId);
+      if (!ok) {
+        error = 'Failed to delete roster assignment';
+        return false;
+      }
+      final day = DateTime(shiftDate.year, shiftDate.month, shiftDate.day);
+      adminRosters = await _service.getAdminRosters(
+        fromDate: day,
+        toDate: day,
+        includeDeleted: false,
+      );
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> createAdminUserWithPassword({
+    required String name,
+    required String email,
+    required String password,
+    required String role,
+    String? phone,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final res = await _service.createAdminUserWithPassword(
+        name: name,
+        email: email,
+        password: password,
+        role: role,
+        phone: phone,
+      );
+      final createdId = int.tryParse(res.trim());
+      final ok = createdId != null && createdId > 0;
+      if (!ok) {
+        error = res;
+        return false;
+      }
+      adminUsers = await _service.getAdminUsers();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> toggleAdminUserActive(String userId) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.toggleAdminUserActive(userId);
+      if (!ok) {
+        error = 'Failed to update user status';
+        return false;
+      }
+      adminUsers = await _service.getAdminUsers();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadAdminAmbulanceContacts() => _load(() async {
+    adminAmbulanceContacts = await _service.getAdminAmbulanceContacts();
+  });
+
+  Future<bool> addAdminAmbulanceContact({
+    required String title,
+    required String phoneBn,
+    required String phoneEn,
+    required bool isPrimary,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.addAdminAmbulanceContact(
+        title: title,
+        phoneBn: phoneBn,
+        phoneEn: phoneEn,
+        isPrimary: isPrimary,
+      );
+      if (!ok) {
+        error = 'Failed to add ambulance contact';
+        return false;
+      }
+      adminAmbulanceContacts = await _service.getAdminAmbulanceContacts();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateAdminAmbulanceContact({
+    required int id,
+    required String title,
+    required String phoneBn,
+    required String phoneEn,
+    required bool isPrimary,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.updateAdminAmbulanceContact(
+        id: id,
+        title: title,
+        phoneBn: phoneBn,
+        phoneEn: phoneEn,
+        isPrimary: isPrimary,
+      );
+      if (!ok) {
+        error = 'Failed to update ambulance contact';
+        return false;
+      }
+      adminAmbulanceContacts = await _service.getAdminAmbulanceContacts();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<bool> updateAdminProfile({
     required String name,

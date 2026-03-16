@@ -125,7 +125,7 @@ class _DoctorDashboardPageState extends State<DoctorDashboardPage> {
                       child: _ReportsPanel(
                         reports: reviewedReports,
                         onRefresh: () => c.loadDoctor(),
-                        onArchive: () => context.go('/doctor/reports'),
+                        onArchive: () => context.go('/doctor/records'),
                       ),
                     ),
                     const SizedBox(width: 16),
