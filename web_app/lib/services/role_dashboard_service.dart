@@ -376,4 +376,20 @@ class RoleDashboardService {
       _client.dispenser.listInventoryItems();
   Future<List<DispenseHistoryEntry>> getDispenserHistory() =>
       _client.dispenser.getDispenserDispenseHistory(limit: 30);
+  Future<List<Prescription>> getDispenserPendingPrescriptions() =>
+      _client.dispenser.getPendingPrescriptions();
+  Future<PrescriptionDetail?> getDispenserPrescriptionDetail(
+    int prescriptionId,
+  ) => _client.dispenser.getPrescriptionDetail(prescriptionId);
+  Future<List<InventoryItemInfo>> searchDispenserInventoryItems(String query) =>
+      _client.dispenser.searchInventoryItems(query);
+  Future<bool> dispensePrescription({
+    required int prescriptionId,
+    int dispenserId = 0,
+    required List<DispenseItemRequest> items,
+  }) => _client.dispenser.dispensePrescription(
+    prescriptionId: prescriptionId,
+    dispenserId: dispenserId,
+    items: items,
+  );
 }

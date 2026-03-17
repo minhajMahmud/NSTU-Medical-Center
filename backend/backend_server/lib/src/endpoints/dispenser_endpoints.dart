@@ -172,9 +172,10 @@ class DispenserEndpoint extends Endpoint {
       // 1️⃣ Lock current stock row
       final stockRes = await session.db.unsafeQuery(
         '''
-      SELECT current_quantity
-      FROM inventory_stock
-      WHERE item_id = @id
+      SELECT s.current_quantity, i.item_name
+      FROM inventory_stock s
+      JOIN inventory_item i ON i.item_id = s.item_id
+      WHERE s.item_id = @id
       FOR UPDATE
       ''',
         parameters: QueryParameters.named({'id': itemId}),
@@ -185,7 +186,9 @@ class DispenserEndpoint extends Endpoint {
         return false;
       }
 
-      final oldQty = stockRes.first.toColumnMap()['current_quantity'] as int;
+      final stockMap = stockRes.first.toColumnMap();
+      final oldQty = (stockMap['current_quantity'] as int?) ?? 0;
+      final itemName = stockMap['item_name']?.toString() ?? 'Item #$itemId';
       final newQty = oldQty + quantity;
 
       // 2️⃣ Update stock
@@ -231,6 +234,13 @@ class DispenserEndpoint extends Endpoint {
           'new': newQty,
           'uid': resolvedUserId,
         }),
+      );
+
+      await _notifyAdmins(
+        session,
+        title: 'Stock Incoming',
+        message:
+            '$itemName received +$quantity unit(s) by dispenser. Current stock: $newQty.',
       );
 
       // 5️⃣ Commit transaction
@@ -406,23 +416,32 @@ class DispenserEndpoint extends Endpoint {
   Future<InventoryItemInfo?> getStockByFirstWord(
       Session session, String medicineName) async {
     try {
-      String firstWord = medicineName.split(' ')[0];
+      final keyword = _extractBestMedicineKeyword(medicineName);
+      if (keyword.isEmpty) return null;
       final result = await session.db.unsafeQuery('''
       SELECT i.item_id, i.item_name, s.current_quantity, i.unit, c.category_name
       FROM inventory_item i
       JOIN inventory_category c ON c.category_id = i.category_id
       JOIN inventory_stock s ON s.item_id = i.item_id
       WHERE i.item_name ILIKE @query
-        AND c.category_name ILIKE 'medicine%'
+        AND s.current_quantity > 0
+      ORDER BY i.item_name ASC
       LIMIT 1;
-    ''', parameters: QueryParameters.named({'query': '$firstWord%'}));
+    ''', parameters: QueryParameters.named({'query': '$keyword%'}));
 
       if (result.isEmpty) return null;
       final row = result.first.toColumnMap();
+      int toInt(dynamic v) {
+        if (v == null) return 0;
+        if (v is int) return v;
+        if (v is num) return v.toInt();
+        return int.tryParse(v.toString()) ?? 0;
+      }
+
       return InventoryItemInfo(
-        itemId: row['item_id'],
-        itemName: row['item_name'],
-        currentQuantity: row['current_quantity'],
+        itemId: toInt(row['item_id']),
+        itemName: row['item_name']?.toString() ?? '',
+        currentQuantity: toInt(row['current_quantity']),
         unit: row['unit'] ?? '',
         minimumStock: 0,
         categoryName: row['category_name']?.toString() ?? '',
@@ -437,6 +456,9 @@ class DispenserEndpoint extends Endpoint {
   Future<List<InventoryItemInfo>> searchInventoryItems(
       Session session, String query) async {
     try {
+      final keyword = _extractBestMedicineKeyword(query);
+      if (keyword.isEmpty) return [];
+
       final result = await session.db.unsafeQuery('''
       SELECT 
         i.item_id, i.item_name, i.unit, s.current_quantity, c.category_name
@@ -444,17 +466,36 @@ class DispenserEndpoint extends Endpoint {
       JOIN inventory_category c ON c.category_id = i.category_id
       JOIN inventory_stock s ON s.item_id = i.item_id
       WHERE i.item_name ILIKE @query
-        AND c.category_name ILIKE 'medicine%'
+        AND s.current_quantity > 0
+      ORDER BY
+        CASE
+          WHEN LOWER(i.item_name) = LOWER(@exact) THEN 0
+          WHEN LOWER(i.item_name) LIKE LOWER(@prefix) THEN 1
+          ELSE 2
+        END,
+        i.item_name ASC
       LIMIT 10
-    ''', parameters: QueryParameters.named({'query': '%$query%'}));
+    ''',
+          parameters: QueryParameters.named({
+            'query': '%$keyword%',
+            'exact': keyword,
+            'prefix': '$keyword%',
+          }));
+
+      int toInt(dynamic v) {
+        if (v == null) return 0;
+        if (v is int) return v;
+        if (v is num) return v.toInt();
+        return int.tryParse(v.toString()) ?? 0;
+      }
 
       return result.map((row) {
         final map = row.toColumnMap();
         return InventoryItemInfo(
-          itemId: map['item_id'],
-          itemName: map['item_name'],
+          itemId: toInt(map['item_id']),
+          itemName: map['item_name']?.toString() ?? '',
           unit: map['unit'] ?? '',
-          currentQuantity: map['current_quantity'] ?? 0,
+          currentQuantity: toInt(map['current_quantity']),
           minimumStock: 0,
           categoryName: map['category_name']?.toString() ?? '',
           canRestockDispenser: true,
@@ -485,10 +526,16 @@ class DispenserEndpoint extends Endpoint {
         if (items.isEmpty) {
           throw Exception('No medicines selected for dispensing');
         }
+
+        final dispensedItemsFlags =
+            await _getDispensedItemsColumnFlags(session);
+        final hasIsAlternative = dispensedItemsFlags.hasIsAlternative;
+        final hasOriginalMedicineId = dispensedItemsFlags.hasOriginalMedicineId;
+
         // ১. মেইন ডিসপেন্স রেকর্ড তৈরি
         final dispenseResult = await session.db.unsafeQuery('''
           INSERT INTO prescription_dispense (prescription_id, dispenser_id, status)
-          VALUES (@pid, @did, TRUE)
+          VALUES (@pid, @did, 'DISPENSED')
           RETURNING dispense_id, dispensed_at
         ''',
             parameters: QueryParameters.named({
@@ -514,9 +561,10 @@ class DispenserEndpoint extends Endpoint {
         for (var item in items) {
           // স্টক চেক এবং লক করা (Race Condition রোখার জন্য)
           final stockCheck = await session.db.unsafeQuery('''
-                    SELECT current_quantity 
-                    FROM inventory_stock
-                    WHERE item_id = @id
+                    SELECT s.current_quantity, i.item_name, i.minimum_stock
+                    FROM inventory_stock s
+                    JOIN inventory_item i ON i.item_id = s.item_id
+                    WHERE s.item_id = @id
                   FOR UPDATE
               ''', parameters: QueryParameters.named({'id': item.itemId}));
 
@@ -526,6 +574,9 @@ class DispenserEndpoint extends Endpoint {
 
           final stockRow = stockCheck.first.toColumnMap();
           final currentStock = (stockRow['current_quantity'] as int?) ?? 0;
+          final inventoryItemName =
+              stockRow['item_name']?.toString() ?? item.medicineName;
+          final minimumStock = (stockRow['minimum_stock'] as int?) ?? 0;
 
           if (currentStock <= 0) {
             throw Exception('No stock available for ${item.medicineName}');
@@ -540,19 +591,37 @@ class DispenserEndpoint extends Endpoint {
           }
 
           // ৩. ডিসপেন্সড আইটেম ইনসার্ট (অল্টারনেটিভ সহ)
-          await session.db.unsafeExecute('''
-            INSERT INTO dispensed_items (
-              dispense_id, item_id, medicine_name, quantity, is_alternative, original_medicine_id
-            ) VALUES (@did, @iid, @name, @qty, @isAlt, @origId)
-          ''',
-              parameters: QueryParameters.named({
-                'did': dispenseId,
-                'iid': item.itemId,
-                'name': item.medicineName,
-                'qty': item.quantity,
-                'isAlt': item.isAlternative,
-                'origId': item.originalMedicineId,
-              }));
+          final insertColumns = <String>[
+            'dispense_id',
+            'item_id',
+            'medicine_name',
+            'quantity',
+          ];
+          final insertValues = <String>['@did', '@iid', '@name', '@qty'];
+          final insertParams = <String, dynamic>{
+            'did': dispenseId,
+            'iid': item.itemId,
+            'name': item.medicineName,
+            'qty': item.quantity,
+          };
+
+          if (hasIsAlternative) {
+            insertColumns.add('is_alternative');
+            insertValues.add('@isAlt');
+            insertParams['isAlt'] = item.isAlternative;
+          }
+
+          if (hasOriginalMedicineId) {
+            insertColumns.add('original_medicine_id');
+            insertValues.add('@origId');
+            insertParams['origId'] = item.originalMedicineId;
+          }
+
+          await session.db.unsafeExecute(
+            'INSERT INTO dispensed_items (${insertColumns.join(', ')}) '
+            'VALUES (${insertValues.join(', ')})',
+            parameters: QueryParameters.named(insertParams),
+          );
 
           // ৪. ইনভেন্টরি আপডেট
           final int newStock = currentStock - item.quantity;
@@ -563,6 +632,17 @@ class DispenserEndpoint extends Endpoint {
                 'newQty': newStock,
                 'id': item.itemId,
               }));
+
+          if (newStock <= minimumStock) {
+            final isOut = newStock == 0;
+            await _notifyAdmins(
+              session,
+              title: isOut ? 'Out of Stock Alert' : 'Low Stock Alert',
+              message: isOut
+                  ? '$inventoryItemName is now out of stock (0 left) after dispensing.'
+                  : '$inventoryItemName is low in stock ($newStock left, minimum: $minimumStock).',
+            );
+          }
 
           // ৫. অডিট লগ তৈরি
           await session.db.unsafeExecute('''
@@ -635,6 +715,8 @@ class DispenserEndpoint extends Endpoint {
   }) async {
     try {
       final resolvedUserId = requireAuthenticatedUserId(session);
+      final dispensedItemsFlags = await _getDispensedItemsColumnFlags(session);
+      final hasIsAlternative = dispensedItemsFlags.hasIsAlternative;
 
       final dispenses = await session.db.unsafeQuery(
         '''
@@ -662,8 +744,15 @@ class DispenserEndpoint extends Endpoint {
         final int dispenseId = (m['dispense_id'] as int);
 
         final itemRows = await session.db.unsafeQuery(
-          '''
+          hasIsAlternative
+              ? '''
           SELECT medicine_name, quantity, is_alternative
+          FROM dispensed_items
+          WHERE dispense_id = @did
+          ORDER BY dispensed_item_id ASC
+          '''
+              : '''
+          SELECT medicine_name, quantity, FALSE AS is_alternative
           FROM dispensed_items
           WHERE dispense_id = @did
           ORDER BY dispensed_item_id ASC
@@ -706,4 +795,121 @@ class DispenserEndpoint extends Endpoint {
     if (value is List<int>) return String.fromCharCodes(value);
     return value.toString();
   }
+
+  Future<void> _notifyAdmins(
+    Session session, {
+    required String title,
+    required String message,
+  }) async {
+    try {
+      final adminRows = await session.db.unsafeQuery(
+        '''
+        SELECT user_id
+        FROM users
+        WHERE LOWER(role::text) = 'admin'
+        ''',
+      );
+
+      for (final row in adminRows) {
+        final uid = row.toColumnMap()['user_id'] as int?;
+        if (uid == null) continue;
+        await session.db.unsafeExecute(
+          '''
+          INSERT INTO notifications (user_id, title, message, is_read, created_at)
+          VALUES (@uid, @title, @message, FALSE, NOW())
+          ''',
+          parameters: QueryParameters.named({
+            'uid': uid,
+            'title': title,
+            'message': message,
+          }),
+        );
+      }
+    } catch (e, st) {
+      session.log('Admin inventory notification failed: $e\n$st',
+          level: LogLevel.warning);
+    }
+  }
+
+  Future<_DispensedItemsColumnFlags> _getDispensedItemsColumnFlags(
+    Session session,
+  ) async {
+    try {
+      final result = await session.db.unsafeQuery(
+        '''
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'dispensed_items'
+        ''',
+      );
+
+      final cols = result
+          .map((r) => (r.toColumnMap()['column_name'] ?? '').toString())
+          .toSet();
+
+      return _DispensedItemsColumnFlags(
+        hasIsAlternative: cols.contains('is_alternative'),
+        hasOriginalMedicineId: cols.contains('original_medicine_id'),
+      );
+    } catch (_) {
+      return const _DispensedItemsColumnFlags(
+        hasIsAlternative: false,
+        hasOriginalMedicineId: false,
+      );
+    }
+  }
+
+  String _extractBestMedicineKeyword(String raw) {
+    final normalized = raw.trim().toLowerCase();
+    if (normalized.isEmpty) return '';
+
+    final words = normalized
+        .replaceAll(RegExp(r'[^a-z0-9\s\-]'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .toList();
+
+    if (words.isEmpty) return '';
+
+    const stopWords = {
+      'alt',
+      'alternative',
+      'alternatives',
+      'to',
+      'for',
+      'of',
+      'the',
+      'medicine',
+      'medicines',
+      'drug',
+      'drugs',
+      'tab',
+      'tablet',
+      'cap',
+      'capsule',
+      'syrup',
+      'injection',
+    };
+
+    final candidates =
+        words.where((w) => w.length >= 3 && !stopWords.contains(w)).toList();
+
+    if (candidates.isEmpty) {
+      return words.first;
+    }
+
+    candidates.sort((a, b) => b.length.compareTo(a.length));
+    return candidates.first;
+  }
+}
+
+class _DispensedItemsColumnFlags {
+  const _DispensedItemsColumnFlags({
+    required this.hasIsAlternative,
+    required this.hasOriginalMedicineId,
+  });
+
+  final bool hasIsAlternative;
+  final bool hasOriginalMedicineId;
 }

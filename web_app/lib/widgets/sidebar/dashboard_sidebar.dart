@@ -214,21 +214,27 @@ class DashboardSidebar extends StatelessWidget {
         return const [
           _NavItem(
             route: '/dispenser/dashboard',
-            label: 'Dashboard',
-            icon: Icons.medication_outlined,
-            selectedIcon: Icons.medication,
-          ),
-          _NavItem(
-            route: '/dispenser/stock',
-            label: 'Stock',
-            icon: Icons.medical_services_outlined,
-            selectedIcon: Icons.medical_services,
+            label: 'Home',
+            icon: Icons.home_outlined,
+            selectedIcon: Icons.home,
           ),
           _NavItem(
             route: '/dispenser/history',
-            label: 'History',
-            icon: Icons.history_outlined,
-            selectedIcon: Icons.history,
+            label: 'Dispense',
+            icon: Icons.local_pharmacy_outlined,
+            selectedIcon: Icons.local_pharmacy,
+          ),
+          _NavItem(
+            route: '/dispenser/stock',
+            label: 'Inventory',
+            icon: Icons.inventory_2_outlined,
+            selectedIcon: Icons.inventory_2,
+          ),
+          _NavItem(
+            route: '/dispenser/profile',
+            label: 'Profile',
+            icon: Icons.person_outline,
+            selectedIcon: Icons.person,
           ),
         ];
       case AppRole.unknown:

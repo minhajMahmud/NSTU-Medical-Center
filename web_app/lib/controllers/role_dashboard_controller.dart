@@ -25,6 +25,7 @@ class RoleDashboardController extends ChangeNotifier {
   List<OndutyStaff> patientOnDutyStaff = [];
   List<AmbulanceContact> patientAmbulanceContacts = [];
   List<NotificationInfo> patientNotifications = [];
+  List<NotificationInfo> get notifications => patientNotifications;
 
   // Doctor
   DoctorHomeData? doctorHome;
@@ -58,6 +59,8 @@ class RoleDashboardController extends ChangeNotifier {
   DispenserProfileR? dispenserProfile;
   List<InventoryItemInfo> dispenserStock = [];
   List<DispenseHistoryEntry> dispenserHistory = [];
+  List<Prescription> dispenserPendingPrescriptions = [];
+  PrescriptionDetail? dispenserPrescriptionDetail;
 
   int unreadNotificationCount = 0;
   Timer? _notificationTimer;
@@ -1016,7 +1019,76 @@ class RoleDashboardController extends ChangeNotifier {
     dispenserProfile = await _service.getDispenserProfile();
     dispenserStock = await _service.getDispenserStock();
     dispenserHistory = await _service.getDispenserHistory();
+    dispenserPendingPrescriptions = await _service
+        .getDispenserPendingPrescriptions();
   });
+
+  Future<void> loadDispenserPendingOnly() => _load(() async {
+    dispenserPendingPrescriptions = await _service
+        .getDispenserPendingPrescriptions();
+  });
+
+  Future<PrescriptionDetail?> loadDispenserPrescriptionDetail(
+    int prescriptionId,
+  ) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      dispenserPrescriptionDetail = await _service
+          .getDispenserPrescriptionDetail(prescriptionId);
+      return dispenserPrescriptionDetail;
+    } catch (e) {
+      error = e.toString();
+      return null;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<List<InventoryItemInfo>> searchDispenserInventoryItems(
+    String query,
+  ) async {
+    try {
+      return await _service.searchDispenserInventoryItems(query);
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      return const [];
+    }
+  }
+
+  Future<bool> dispenseDispenserPrescription({
+    required int prescriptionId,
+    required List<DispenseItemRequest> items,
+  }) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      final ok = await _service.dispensePrescription(
+        prescriptionId: prescriptionId,
+        dispenserId: 0,
+        items: items,
+      );
+      if (!ok) {
+        error = 'Dispense request failed';
+        return false;
+      }
+      dispenserPendingPrescriptions = await _service
+          .getDispenserPendingPrescriptions();
+      dispenserStock = await _service.getDispenserStock();
+      dispenserHistory = await _service.getDispenserHistory();
+      return true;
+    } catch (e) {
+      error = e.toString();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<bool> updateDispenserProfile({
     required String name,

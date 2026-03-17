@@ -53,9 +53,14 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
       caseSensitive: false,
     ).firstMatch(message)?.group(1)?.trim();
     if (routeToken != null && routeToken.startsWith('/')) return routeToken;
+
     final currentPath = GoRouterState.of(context).uri.path;
-    if (currentPath.startsWith('/doctor')) return '/doctor/records';
-    return '/patient/lab-tests';
+    if (currentPath.startsWith('/doctor')) return '/doctor/reports';
+    if (currentPath.startsWith('/admin')) return '/admin/reports';
+    if (currentPath.startsWith('/lab')) return '/lab/results';
+    if (currentPath.startsWith('/dispenser')) return '/dispenser/history';
+    if (currentPath.startsWith('/patient')) return '/patient/reports';
+    return '/home';
   }
 
   ({IconData icon, Color color, String type}) _notificationStyle(
@@ -112,6 +117,15 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
     return DateFormat('MMM d').format(dt);
   }
 
+  String _notificationPanelTitle(String path) {
+    if (path.startsWith('/admin')) return 'Admin Notifications';
+    if (path.startsWith('/doctor')) return 'Doctor Notifications';
+    if (path.startsWith('/lab')) return 'Lab Notifications';
+    if (path.startsWith('/dispenser')) return 'Dispenser Notifications';
+    if (path.startsWith('/patient')) return 'Patient Notifications';
+    return 'Notifications';
+  }
+
   void _submitSearch(BuildContext context) {
     final query = _searchCtrl.text.trim();
     final state = GoRouterState.of(context);
@@ -145,7 +159,7 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
     } else if (q.contains('report') ||
         q.contains('audit') ||
         q.contains('analytics')) {
-      target = '/admin/dashboard';
+      target = '/admin/reports';
     } else if (q.contains('user') ||
         q.contains('doctor') ||
         q.contains('patient') ||
@@ -252,6 +266,8 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
 
   Future<void> _openNotificationsPanel(BuildContext context) async {
     final c = context.read<RoleDashboardController>();
+    final currentPath = GoRouterState.of(context).uri.path;
+    final panelTitle = _notificationPanelTitle(currentPath);
     await c.refreshNotifications(silent: true);
     if (!context.mounted) return;
 
@@ -271,17 +287,18 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
         );
       },
       pageBuilder: (ctx, _, __) {
+        final viewportHeight = MediaQuery.of(ctx).size.height;
         return Align(
           alignment: Alignment.centerRight,
           child: Material(
             elevation: 8,
             child: SizedBox(
               width: 380,
-              height: double.infinity,
+              height: viewportHeight,
               child: SafeArea(
                 child: Consumer<RoleDashboardController>(
                   builder: (_, ctrl, __) {
-                    final sorted = [...ctrl.patientNotifications]
+                    final sorted = [...ctrl.notifications]
                       ..sort((a, b) {
                         final unreadPriority = (a.isRead ? 1 : 0).compareTo(
                           b.isRead ? 1 : 0,
@@ -301,27 +318,131 @@ class _AppTopNavigationBarState extends State<AppTopNavigationBar> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
-                          child: Row(
-                            children: [
-                              Text(
-                                'Notifications',
-                                style: Theme.of(ctx).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              const Spacer(),
-                              TextButton.icon(
-                                onPressed: sorted.isEmpty
-                                    ? null
-                                    : () => ctrl.markAllNotificationsAsRead(),
-                                icon: const Icon(Icons.done_all, size: 18),
-                                label: const Text('Mark all read'),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.close),
-                                tooltip: 'Close',
-                                onPressed: () => Navigator.of(ctx).pop(),
-                              ),
-                            ],
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final compact = constraints.maxWidth < 420;
+
+                              final liveBadge = Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFECFDF5),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: const Color(0xFFA7F3D0),
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.circle,
+                                      size: 8,
+                                      color: Color(0xFF10B981),
+                                    ),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Live',
+                                      style: TextStyle(
+                                        color: Color(0xFF065F46),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (compact) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            panelTitle,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(ctx)
+                                                .textTheme
+                                                .titleLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.close),
+                                          tooltip: 'Close',
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop(),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        liveBadge,
+                                        const Spacer(),
+                                        TextButton.icon(
+                                          onPressed: sorted.isEmpty
+                                              ? null
+                                              : () => ctrl
+                                                    .markAllNotificationsAsRead(),
+                                          icon: const Icon(
+                                            Icons.done_all,
+                                            size: 18,
+                                          ),
+                                          label: const Text('Mark all'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              }
+
+                              return Row(
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            panelTitle,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(ctx)
+                                                .textTheme
+                                                .titleLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        liveBadge,
+                                      ],
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: sorted.isEmpty
+                                        ? null
+                                        : () =>
+                                              ctrl.markAllNotificationsAsRead(),
+                                    icon: const Icon(Icons.done_all, size: 18),
+                                    label: const Text('Mark all read'),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close),
+                                    tooltip: 'Close',
+                                    onPressed: () => Navigator.of(ctx).pop(),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
                         const Divider(height: 1),

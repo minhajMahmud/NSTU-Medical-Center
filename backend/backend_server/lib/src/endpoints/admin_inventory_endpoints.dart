@@ -173,8 +173,9 @@ class AdminInventoryEndpoints extends Endpoint {
       // Get current stock
       final stockRes = await session.db.unsafeQuery(
         '''
-      SELECT current_quantity
-      FROM inventory_stock
+      SELECT s.current_quantity, i.item_name, i.minimum_stock
+      FROM inventory_stock s
+      JOIN inventory_item i ON i.item_id = s.item_id
       WHERE item_id = @id
       FOR UPDATE
       ''',
@@ -186,7 +187,10 @@ class AdminInventoryEndpoints extends Endpoint {
         return false;
       }
 
-      final oldQty = stockRes.first.toColumnMap()['current_quantity'] as int;
+      final stockMap = stockRes.first.toColumnMap();
+      final oldQty = (stockMap['current_quantity'] as int?) ?? 0;
+      final itemName = stockMap['item_name']?.toString() ?? 'Item #$itemId';
+      final minimumStock = (stockMap['minimum_stock'] as int?) ?? 0;
 
       final int newQty = type == 'IN' ? oldQty + quantity : oldQty - quantity;
 
@@ -242,6 +246,25 @@ class AdminInventoryEndpoints extends Endpoint {
         }),
       );
 
+      if (type == 'IN') {
+        await _notifyAdmins(
+          session,
+          title: 'Stock Incoming',
+          message:
+              '$itemName received +$quantity unit(s). Current stock: $newQty.',
+        );
+      }
+
+      if (newQty <= minimumStock) {
+        final isOut = newQty == 0;
+        await _notifyAdmins(
+          session,
+          title: isOut ? 'Out of Stock Alert' : 'Low Stock Alert',
+          message: isOut
+              ? '$itemName is now out of stock (0 left).'
+              : '$itemName is low in stock ($newQty left, minimum: $minimumStock).',
+        );
+      }
       await session.db.unsafeExecute('COMMIT');
       return true;
     } catch (e, st) {
@@ -473,6 +496,41 @@ class AdminInventoryEndpoints extends Endpoint {
       //
       session.log('getInventoryAuditLogs failed: $e', level: LogLevel.error);
       return [];
+    }
+  }
+
+  Future<void> _notifyAdmins(
+    Session session, {
+    required String title,
+    required String message,
+  }) async {
+    try {
+      final adminRows = await session.db.unsafeQuery(
+        '''
+        SELECT user_id
+        FROM users
+        WHERE LOWER(role::text) = 'admin'
+        ''',
+      );
+
+      for (final row in adminRows) {
+        final uid = row.toColumnMap()['user_id'] as int?;
+        if (uid == null) continue;
+        await session.db.unsafeExecute(
+          '''
+          INSERT INTO notifications (user_id, title, message, is_read, created_at)
+          VALUES (@uid, @title, @message, FALSE, NOW())
+          ''',
+          parameters: QueryParameters.named({
+            'uid': uid,
+            'title': title,
+            'message': message,
+          }),
+        );
+      }
+    } catch (e, st) {
+      session.log('Admin inventory notification failed: $e\n$st',
+          level: LogLevel.warning);
     }
   }
 }

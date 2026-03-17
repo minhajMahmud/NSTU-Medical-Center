@@ -12,6 +12,7 @@ import '../../pages/appointments/appointments_page.dart';
 import '../../pages/dashboard/patient_dashboard_page.dart';
 import '../../pages/dispenser/dispenser_dashboard_page.dart';
 import '../../pages/dispenser/dispenser_history_page.dart';
+import '../../pages/dispenser/dispenser_profile_page.dart';
 import '../../pages/dispenser/dispenser_stock_page.dart';
 import '../../pages/doctor/doctor_dashboard_page.dart';
 import '../../pages/doctor/doctor_prescription_creator_page.dart';
@@ -234,6 +235,10 @@ GoRouter createAppRouter(AuthController auth) {
       GoRoute(
         path: '/dispenser/history',
         builder: (_, __) => const DispenserHistoryPage(),
+      ),
+      GoRoute(
+        path: '/dispenser/profile',
+        builder: (_, __) => const DispenserProfilePage(),
       ),
     ],
   );
