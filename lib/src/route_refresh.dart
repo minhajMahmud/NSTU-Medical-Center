@@ -122,6 +122,9 @@ mixin RouteRefreshMixin<T extends StatefulWidget> on State<T>
   void didHaveMemoryPressure() {}
 
   @override
+  void handleStatusBarTap() {}
+
+  @override
   void didChangeViewFocus(ViewFocusEvent event) {}
 
   @override
