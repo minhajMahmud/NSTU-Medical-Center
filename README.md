@@ -1,123 +1,202 @@
-# NSTU Medical Center
+# NSTU Medical Center — Deployment & Operations README
 
-A multi-platform medical center management system built with **Flutter** (Web + Android) and a **Serverpod** backend.
+A complete guide for project structure, environment setup, web deployment (Vercel), backend deployment (Railway), and Android APK release.
 
-## Project Structure
+---
+## NSTU MEDICAL CENTER ANDROID APP =>
+https://medical-center-frontend.vercel.app/
+## 1) Project Overview
 
-- `backend/backend_server` — Serverpod backend API
-- `packages/backend_client` — Shared generated API client (used by all frontends)
-- `web_app` — Flutter Web frontend
-- Root Flutter app (`lib/`, `android/`) — Flutter mobile app (Android)
+NSTU Medical Center is a Flutter-based multi-platform frontend connected to a Serverpod backend.
 
-## Features
-
-- Role-based access: **Patient, Doctor, Admin, Lab, Dispenser**
-- Authentication and protected routes
-- Appointment and prescription management
-- Lab report upload/view workflows
-- Inventory and medicine dispensing flows
-- Notifications and operational audit logs
-
-## Tech Stack
-
-- **Frontend:** Flutter
+- **Frontend:** Flutter (Web + Android)
 - **Backend:** Serverpod (Dart)
 - **Database:** PostgreSQL
-- **Cache/Support services:** Redis
-- **Targets:** Web and Android
+- **Hosting:**
+  - **Frontend Web:** Vercel
+  - **Backend API:** Railway
 
-## Prerequisites
+---
+
+## 2) Repository Structure
+
+```text
+frontend/
+├─ lib/                         # Main Flutter app source
+├─ packages/
+│  └─ backend_client/           # Generated/Shared Serverpod API client
+├─ android/                     # Android project config and Gradle
+├─ ios/                         # iOS project
+├─ web/                         # Flutter web wrapper assets
+├─ assets/                      # Fonts/images/static assets
+├─ test/                        # Flutter tests
+├─ pubspec.yaml                 # Flutter dependencies
+├─ vercel.json                  # Vercel web build config
+├─ README.md                    # General project readme
+└─ README_DEPLOYMENT.md         # This deployment guide
+```
+
+---
+
+## 3) Backend URL Configuration (Critical)
+
+Frontend reads backend URL from compile-time define:
+
+- `SERVERPOD_URL`
+
+Current production-safe default in client:
+
+- `https://medicalcenterbackend-production.up.railway.app/`
+
+> For production APK/web builds, always ensure backend URL points to Railway (HTTPS + trailing slash).
+
+---
+
+## 4) Local Development Setup
+
+### Prerequisites
 
 - Flutter SDK (stable)
 - Dart SDK
-- Docker Desktop (for PostgreSQL/Redis services)
-- Java 17 (for Android builds)
+- Java 17 or 21 (recommended for Android builds)
+- Android SDK + platform tools
+
+### Install dependencies
+
+```bash
+flutter pub get
+```
+
+### Run web locally (point to local backend)
+
+```bash
+flutter run -d chrome --dart-define=SERVERPOD_URL=http://localhost:8080/
+```
+
+### Run android locally
+
+```bash
+flutter run -d android --dart-define=SERVERPOD_URL=http://<your-lan-ip>:8080/
+```
+
+> Do not use `localhost` on a physical Android phone for local backend access.
 
 ---
 
-## Backend Setup (Serverpod)
+## 5) Web Deployment (Vercel)
 
-From repository root:
+### Build command concept
 
-`cd backend/backend_server`
+Vercel should build with:
 
-`dart pub get`
+- `flutter pub get`
+- `flutter build web --release --dart-define=SERVERPOD_URL=https://<railway-backend>/`
 
-`docker compose up --build --detach`
+### Output directory
 
-`dart bin/main.dart --apply-migrations`
+- `build/web`
 
-`dart bin/main.dart`
+### SPA rewrite
 
-Default backend URL:
-
-- `http://localhost:8080/`
-
----
-
-## Web App Setup (`web_app`)
-
-From repository root:
-
-`cd web_app`
-
-`flutter pub get`
-
-`flutter run -d chrome --dart-define=SERVERPOD_URL=http://localhost:8080/`
-
-Production build:
-
-`flutter build web --release --dart-define=SERVERPOD_URL=https://your-api-url/`
-
-Build output:
-
-- `web_app/build/web`
+Ensure rewrite to `index.html` for route handling.
 
 ---
 
-## Android App Setup (Root Flutter App)
+## 6) Backend Deployment (Railway)
 
-From repository root:
+For backend service, set required variables in Railway **service variables**:
 
-`flutter pub get`
+- `DATABASE_URL` (if used by your runtime)
+- `SERVERPOD_PASSWORD_database`
+- `RESEND_API_KEY`
+- `ALLOW_CONSOLE_OTP_FALLBACK=true` (temporary debug only)
 
-`flutter run -d android --dart-define=SERVERPOD_URL=http://<your-local-ip>:8080/`
+Recommended explicit DB mapping vars (if your `production.yaml` uses them):
 
-> For physical Android devices, do **not** use `localhost`; use your PC's LAN IP.
+- `DATABASE_HOST`
+- `DATABASE_PORT`
+- `DATABASE_NAME`
+- `DATABASE_USER`
 
-Build APK:
+### Important for stability
 
-`flutter build apk --release`
-
-Build App Bundle:
-
-`flutter build appbundle --release`
-
----
-
-## Backend URL Configuration
-
-Clients support backend override via:
-
-- `--dart-define=SERVERPOD_URL=<url>`
-
-Examples:
-
-- Local: `http://localhost:8080/`
-- LAN (mobile testing): `http://192.168.x.x:8080/`
-- Production: `https://api.example.com/`
+- Database SSL should be enabled for Railway Postgres connections in production config.
+- After adding/changing variables, always **redeploy/restart** service.
 
 ---
 
-## Troubleshooting
+## 7) Android APK Build & Release
 
-- **Port 8080/8081/8082 already in use:** stop previous backend process, then rerun.
-- **Push rejected (non-fast-forward):** fetch + rebase, then push.
-- **Cannot connect to backend:** verify `SERVERPOD_URL` and network route.
-- **Generated model mismatch errors:** regenerate Serverpod code and run dependency sync again.
+### Build release APK
+
+```bash
+flutter build apk --release --dart-define=SERVERPOD_URL=https://medicalcenterbackend-production.up.railway.app/
+```
+
+### Generated file
+
+- `build/app/outputs/flutter-apk/app-release.apk`
+
+### Install notes
+
+- Uninstall old app if signature/version conflicts.
+- Install the latest `app-release.apk`.
 
 ---
 
-## License
+## 8) Known Build Compatibility Notes
 
-Licensed under the terms defined in `LICENSE`.
+- Use **JDK 17 or JDK 21** for Android build stability.
+- JDK 25 may cause Gradle/Kotlin parsing/runtime issues in this toolchain.
+- If plugin registration fails for JNI-related classes, keep dependency lock/override aligned with project-tested versions.
+
+---
+
+## 9) OTP/Login Troubleshooting
+
+If login shows: **"Failed to send login OTP"**
+
+Check backend first:
+
+1. Railway logs during login request
+2. Resend API key validity
+3. Verified sender/domain in Resend
+4. DB connectivity health (no connection reset errors)
+
+If logs show database reset errors (`Connection reset by peer`), fix DB connection config/SSL before OTP testing.
+
+---
+
+## 10) Security Best Practices (Very Important)
+
+Do **not** commit real secrets in `.env`.
+
+Rotate and replace exposed keys immediately if leaked:
+
+- Resend API key
+- Cloudinary API secret
+- Database password
+
+Keep `.env.example` with placeholders only.
+
+---
+
+## 11) Suggested Release Checklist
+
+- [ ] Backend healthy on Railway (logs clean)
+- [ ] OTP provider configured and working
+- [ ] Web build points to Railway URL
+- [ ] Android release APK built with production URL
+- [ ] Smoke test: login, dashboard, key API-backed screens
+- [ ] Secrets rotated and secured
+
+---
+
+## 12) Maintainer Notes
+
+When changing API base URL behavior, update both:
+
+- `packages/backend_client/lib/backend_client.dart`
+- Deployment docs (`README.md` / `README_DEPLOYMENT.md`)
+
+This keeps APK and web deployments consistent across environments.
