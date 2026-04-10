@@ -5,6 +5,8 @@ A complete guide for project structure, environment setup, web deployment (Verce
 ---
 ## NSTU MEDICAL CENTER ANDROID APP =>
 https://medical-center-frontend.vercel.app/
+## NSTU MEDICAL CENTER WEB APP =>
+https://medical-center-frontend-web.vercel.app/
 ## 1) Project Overview
 
 NSTU Medical Center is a Flutter-based multi-platform frontend connected to a Serverpod backend.
