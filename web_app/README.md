@@ -1,89 +1,79 @@
-# NSTU Medical Center - Web App
+# NSTU Medical Center — Web App
 
-Professional Flutter Web frontend for the NSTU Medical Center system.
+Flutter Web frontend for the NSTU Medical Center system.
 
-## Architecture
+## Overview
 
-This repository now supports platform-separated frontends with a shared backend:
+This app lives in `web_app/` and connects to the same Serverpod backend used by other clients.
 
-- `backend/backend_server` → Serverpod backend (unchanged)
-- `mobile_app` → existing Flutter mobile app (current root app)
-- `web_app` → new Flutter Web frontend
+Related directories:
 
-The web app uses the same backend client package:
+- `backend/backend_server` → Serverpod backend
+- `packages/backend_client` → shared generated API client
+- `web_app` → this Flutter Web application
 
-- `../packages/backend_client`
+## Requirements
 
-## Backend API Configuration
+- Flutter SDK (stable)
+- Dart SDK (comes with Flutter)
+- Running backend API (Serverpod)
 
-Default URL is configured in `lib/core/config/app_config.dart`:
+## Backend configuration
 
-- `https://api.nstu-medical.com/`
+The web app supports a configurable backend URL.
 
-Override at build/run time with:
+- Default behavior: uses app config from `lib/core/config/app_config.dart`
+- Override at runtime/build time:
 
-- `--dart-define=SERVERPOD_URL=https://your-api-url/`
+`--dart-define=SERVERPOD_URL=https://your-api-url/`
 
-## Web Frontend Structure
+For local development, a typical value is:
 
-`lib/` contains:
+`--dart-define=SERVERPOD_URL=http://localhost:8080/`
 
-- `core/` config, constants, themes, responsive utilities
-- `services/` API/auth/appointment services
-- `models/` doctor, patient, appointment models
-- `controllers/` auth and appointment controllers
-- `pages/` home, login, dashboard, doctors, appointments, reports, admin
-- `widgets/` navbar, sidebar, cards, common components
+## Install dependencies
 
-## Routing
+From `web_app/`:
 
-Configured with `go_router` in `lib/core/config/app_router.dart`:
+`flutter pub get`
 
-- `/home`
-- `/login`
-- `/dashboard` (auto-redirects to role dashboard)
-- `/patient/dashboard`
-- `/patient/appointments`
-- `/patient/reports`
-- `/doctor/dashboard`
-- `/admin/dashboard`
-- `/lab/dashboard`
-- `/dispenser/dashboard`
+## Run (development)
 
-## Role-aware and guarded access
+From `web_app/`:
 
-- Patient, Doctor, Admin, Lab, and Dispenser roles are supported.
-- Private routes are protected; unauthenticated users are redirected to `/login`.
-- Authenticated users are automatically redirected to their role-specific dashboard.
-- Sidebar and top navigation adapt based on logged-in role.
+`flutter run -d chrome --dart-define=SERVERPOD_URL=http://localhost:8080/`
 
-## Endpoint-backed role dashboards
+## Build (production)
 
-- Patient: doctors, prescriptions/appointments, and medical reports.
-- Doctor: home summary + patient prescription list.
-- Admin: overview + analytics chart + recent audit table.
-- Lab: today summary + latest result history.
-- Dispenser: stock table + dispense history.
+From `web_app/`:
 
-## Run & Build
+`flutter build web --release --dart-define=SERVERPOD_URL=https://api.nstu-medical.com/`
 
-### Development
+Build output:
 
-`flutter run -d chrome`
+- `web_app/build/web`
 
-### Production build
+## Main app structure
 
-`flutter build web`
+`lib/` includes:
 
-Output directory:
+- `core/` → configuration, theme, routing, constants
+- `controllers/` → auth and feature controllers
+- `models/` → frontend models
+- `pages/` → role-based screens and modules
+- `services/` → API/business access
+- `widgets/` → reusable UI components
 
-- `build/web`
+## Routing and role access
 
-## Deployment Targets
+Routing is configured with `go_router`.
 
-The `build/web` output can be deployed to:
+- Unauthenticated users are redirected to `/login`
+- Authenticated users are redirected to role-specific dashboards
+- Roles supported: Patient, Doctor, Admin, Lab, Dispenser
 
-- Netlify
-- Vercel
-- Firebase Hosting
-- Nginx (static hosting)
+## Troubleshooting
+
+- If login/API calls fail, verify backend is running on the same URL passed via `SERVERPOD_URL`.
+- If browser build cache causes stale behavior, hard refresh the page (`Ctrl + F5`).
+- If generated API models mismatch backend, regenerate backend/client code and run `flutter pub get` again.
